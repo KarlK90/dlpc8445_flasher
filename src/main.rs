@@ -1,6 +1,10 @@
-use std::{path::PathBuf, time::Duration};
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+    time::Duration,
+};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 use log::{error, info, warn};
 
@@ -19,7 +23,7 @@ struct Ops {
     flash: bool,
     #[arg(
         long,
-        help = "Switch to flash mode before flashing if not already in flash mode"
+        help = "Switch to flash mode before flashing if not already in flash mode (DANGER: switching from application to bootrom invalidates the image on flash; you must flash a valid image immediately afterward)"
     )]
     enter_flash_mode: bool,
     #[arg(long, help = "Erase flash sectors occupied by the image")]
@@ -33,6 +37,10 @@ fn main() -> Result<()> {
 
     let args = Ops::parse();
     let mut flash_state = FlashState::from_image(&args.file)?;
+
+    if args.enter_flash_mode {
+        confirm_enter_flash_mode()?;
+    }
 
     info!("Waiting for device...");
 
@@ -65,6 +73,30 @@ fn main() -> Result<()> {
     } else {
         info!("Flash validation complete");
     }
+    Ok(())
+}
+
+fn confirm_enter_flash_mode() -> Result<()> {
+    warn!(
+        "WARNING: --enter-flash-mode switches the DLPC8445 from application mode to bootrom, \
+which invalidates the image currently found on flash."
+    );
+    warn!(
+        "You must flash a valid image immediately after entering flash mode, or the device may not boot."
+    );
+    warn!("Type yes to continue:");
+
+    print!("> ");
+    io::stdout().flush()?;
+
+    let mut response = String::new();
+    io::stdin().read_line(&mut response)?;
+
+    let response = response.trim().to_ascii_lowercase();
+    if response != "yes" && response != "y" {
+        bail!("aborted by user");
+    }
+
     Ok(())
 }
 

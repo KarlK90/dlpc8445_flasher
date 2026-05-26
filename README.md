@@ -66,6 +66,10 @@ Write firmware to the device:
 ./dlpc8845_flasher --flash --file firmware.img --enter-flash-mode
 ```
 
+> [!WARNING]
+> `--enter-flash-mode` switches the DLPC8445 from application mode to bootrom.  
+> This invalidates the image currently on flash, so you must flash a valid image immediately afterward.
+
 **Behavior**:
 
 - Connects to device and verifies flash mode (optionally switches with `--enter-flash-mode`)
@@ -93,7 +97,7 @@ Force erase all flash sectors occupied by the image before flashing:
 | -------------------- | ----- | ---- | ------------------------------------------------------------- |
 | `--file`             | `-f`  | PATH | Firmware image file (default: `AWOL_DLP_Upgrade.img`)         |
 | `--flash`            |       | FLAG | Enable flash programming (default: validation only)           |
-| `--enter-flash-mode` |       | FLAG | Automatically switch to flash mode if in MainApplication mode |
+| `--enter-flash-mode` |       | FLAG | Switch to flash mode; prompts before invalidating the current flash image |
 | `--erase`            |       | FLAG | Erase all flash sectors that would be occupied by the image   |
 | `--help`             | `-h`  |      | Display help message                                          |
 | `--version`          | `-V`  |      | Display version information                                   |
