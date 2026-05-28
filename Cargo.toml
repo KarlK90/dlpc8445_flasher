@@ -9,7 +9,7 @@ name = "dlpc8445_proto"
 path = "src/lib.rs"
 
 [[bin]]
-name = "dlpc8845_flasher"
+name = "dlpc8445_flasher"
 path = "src/main.rs"
 
 [dependencies]
