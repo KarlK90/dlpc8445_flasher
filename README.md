@@ -27,7 +27,7 @@ cd dlpc8445_flasher
 cargo build --release
 
 # The binary will be available at:
-# target/release/dlpc8845_flasher
+# target/release/dlpc8445_flasher
 ```
 
 ### Command-Line Interface
@@ -35,7 +35,7 @@ cargo build --release
 #### Basic Help
 
 ```bash
-./dlpc8845_flasher --help
+./dlpc8445_flasher --help
 ```
 
 #### Operation Modes
@@ -46,10 +46,10 @@ Verify the flash contains the expected firmware without writing:
 
 ```bash
 # Validate with default image name (AWOL_DLP_Upgrade.img)
-./dlpc8845_flasher
+./dlpc8445_flasher
 
 # Validate with custom image file
-./dlpc8845_flasher --file /path/to/firmware.img
+./dlpc8445_flasher --file /path/to/firmware.img
 ```
 
 **Output**: Compares each sector's checksum with the image. Reports any mismatches.
@@ -60,10 +60,10 @@ Write firmware to the device:
 
 ```bash
 # Program flash with default image
-./dlpc8845_flasher --flash --file firmware.img
+./dlpc8445_flasher --flash --file firmware.img
 
 # Program with automatic mode switching
-./dlpc8845_flasher --flash --file firmware.img --enter-flash-mode
+./dlpc8445_flasher --flash --file firmware.img --enter-flash-mode
 ```
 
 > [!WARNING]
@@ -84,7 +84,7 @@ Write firmware to the device:
 Force erase all flash sectors occupied by the image before flashing:
 
 ```bash
-./dlpc8845_flasher --file firmware.img --erase
+./dlpc8445_flasher --file firmware.img --erase
 ```
 
 **Behavior**:
