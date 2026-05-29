@@ -214,26 +214,26 @@ impl Dlpc8445Con {
     pub fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
-            let image_checksum = sector.checksum;
-            let flash_checksum = self.read_sector_checksum(sector)?.as_u64();
 
-            info!(
-                "Sector {} checksum image=0x{:08X} flash=0x{:08X}",
-                sector.idx, image_checksum, flash_checksum
-            );
-
-            if flash_checksum != image_checksum {
-                return Err(Dlpc8445Error::general(format!(
-                    "validation failed for sector {} at 0x{:08X}; checksum mismatch (image=0x{:08X}, flash=0x{:08X})",
-                    sector.idx, sector.start_addr, image_checksum, flash_checksum
-                )));
+            match self.validate_sector(sector) {
+                Ok(_) => info!("Sector {}: valid", sector.idx),
+                Err(err) => error!("Sector {}: invalid {err}", sector.idx),
             }
-
-            info!("Sector {} valid", sector.idx);
             flash_state.advance_sector();
         }
 
-        Ok(())
+        let (total, valid, invalid) = flash_state.validation_result();
+
+        let msg = format!(
+            "Validation complete: {valid}/{total} sectors valid, {invalid} sectors invalid"
+        );
+
+        if total == valid {
+            info!("{msg}");
+            return Ok(());
+        } else {
+            Err(Dlpc8445Error::general(msg))
+        }
     }
 
     fn unlock_flash(&mut self) -> Result<()> {

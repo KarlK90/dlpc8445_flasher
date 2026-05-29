@@ -113,6 +113,12 @@ impl FlashState {
             .find(|sector| sector.idx == 0)
             .expect("flash image must have at least one sector")
     }
+
+    pub fn validation_result(&self) -> (usize, usize, usize) {
+        let total = self.sectors.len();
+        let valid = self.sectors.iter().filter(|s| s.verified).count();
+        (total, valid, total - valid)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
