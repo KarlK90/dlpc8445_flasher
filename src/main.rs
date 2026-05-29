@@ -108,7 +108,7 @@ fn run_session(
 ) -> std::result::Result<(), Dlpc8445Error> {
     dlpc.verify_flash_mode(args.enter_flash_mode)?;
 
-    let dlpc_info = dlpc.get_info()?;
+    let dlpc_info = dlpc.query_info()?;
     if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
         return Err(Dlpc8445Error::general(format!(
             "controller reported an invalid flash sector size of {} bytes, expected {}",

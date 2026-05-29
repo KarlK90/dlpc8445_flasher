@@ -14,10 +14,9 @@ use crate::{
     Dlpc8445Error, Result,
     flash::{FLASH_PAGE_SIZE, FlashSector},
     protocol::{
-        ApplicationMode, BootHoldReasonResponse, ErrorCode, FlashIdResponse,
-        FlashSectorInformationResponse, ReadBootHoldReasonCommand, ReadFlashIdCommand,
-        ReadGetFlashSectorInformationCommand, ReadModeCommand, SwitchApplicationOption,
-        WriteSwitchApplicationCommand,
+        ApplicationMode, BootHoldReasonResponse, FlashIdResponse, FlashSectorInformationResponse,
+        ReadBootHoldReasonCommand, ReadFlashIdCommand, ReadGetFlashSectorInformationCommand,
+        ReadModeCommand, SwitchApplicationOption, WriteSwitchApplicationCommand,
     },
 };
 use crate::{
@@ -36,12 +35,14 @@ const MAX_PAGE_REPROGRAM_ATTEMPTS: usize = 3;
 pub struct Dlpc8445Con {
     writer: EndpointWrite<Bulk>,
     reader: EndpointRead<Bulk>,
+    info: Option<Dlpc8445Info>,
 }
 
 pub struct Dlpc8445Info {
     pub boot_hold_reason: BootHoldReasonResponse,
     pub flash_id: FlashIdResponse,
     pub flash_sector: FlashSectorInformationResponse,
+    pub mode: ApplicationMode,
 }
 
 impl Dlpc8445Con {
@@ -72,19 +73,29 @@ impl Dlpc8445Con {
             .reader(512)
             .with_read_timeout(Duration::from_secs(1));
 
-        Ok(Self { writer, reader })
+        Ok(Self {
+            writer,
+            reader,
+            info: None,
+        })
     }
 
-    pub fn get_info(&mut self) -> Result<Dlpc8445Info> {
+    pub fn query_info(&mut self) -> Result<&Dlpc8445Info> {
         let boot_hold_reason = self.send_command(ReadBootHoldReasonCommand)?;
         let flash_info = self.send_command(ReadFlashIdCommand)?;
         let flash_sector_info = self.send_command(ReadGetFlashSectorInformationCommand)?;
+        let mode = self.send_command(ReadModeCommand)?.application_mode();
 
-        Ok(Dlpc8445Info {
+        self.info = Some(Dlpc8445Info {
             boot_hold_reason,
             flash_id: flash_info,
             flash_sector: flash_sector_info,
-        })
+            mode,
+        });
+
+        self.info
+            .as_ref()
+            .ok_or_else(|| Dlpc8445Error::general("failed to query device info"))
     }
 
     pub fn send_command<T, R>(&mut self, command: T) -> Result<R>
@@ -93,44 +104,31 @@ impl Dlpc8445Con {
         R: ResponsePayload,
     {
         trace!("Sending command: {:?}", command);
-        let mut retries = 3;
-        let command = command.into_packet()?;
+        // Bug in boot rom, no response if checksum is present!
+        let checksum_present = self.info.as_ref().is_some_and(|info| {
+            matches!(
+                info.mode,
+                ApplicationMode::MainApplication | ApplicationMode::SecondaryBootApplication
+            )
+        });
+        let command = command
+            .into_packet()?
+            .set_checksum_present(checksum_present);
         let encoded = command.encode()?;
 
-        loop {
-            self.writer.write_all(&encoded)?;
-            self.writer.flush_end()?;
+        self.writer.write_all(&encoded)?;
+        self.writer.flush_end()?;
 
-            let mut response = Vec::new();
-            let mut reader = self.reader.until_short_packet();
-            reader.read_to_end(&mut response)?;
-            reader
-                .consume_end()
-                .map_err(|err| Dlpc8445Error::general(err.to_string()))?;
+        let mut response = Vec::new();
+        let mut reader = self.reader.until_short_packet();
+        reader.read_to_end(&mut response)?;
+        reader
+            .consume_end()
+            .map_err(|err| Dlpc8445Error::general(err.to_string()))?;
 
-            let response = command.decode::<R>(&response);
-
-            match response {
-                Ok(response) => return R::decode(response.data),
-                Err(err) => {
-                    if retries == 0 {
-                        error!("Command failed after 3 retries: {}", err);
-                        return Err(err);
-                    }
-                    // Retry on checksum mismatch or buffer full
-                    if let Dlpc8445Error::Protocol(err) = &err
-                        && let Some(err) = err.custom_err::<ErrorCode>()
-                        && matches!(err, ErrorCode::ChecksumMismatch | ErrorCode::BufferFull)
-                    {
-                        warn!("Retrying after receiving error: {}", err);
-                        retries -= 1;
-                        continue;
-                    }
-
-                    return Err(err);
-                }
-            }
-        }
+        command
+            .decode::<R>(&response)
+            .and_then(|resp| R::decode(resp.data))
     }
 
     pub fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<()> {

@@ -68,12 +68,6 @@ pub trait Command: std::fmt::Debug + Sized + BinWrite + for<'a> BinWrite<Args<'a
     fn into_packet(self) -> Result<CommandPacket<Self>> {
         CommandPacket::new(self)
     }
-
-    fn with_header_destination(self, destination: u8) -> Result<CommandPacket<Self>> {
-        let mut command = CommandPacket::new(self)?;
-        command.header.set_destination(destination);
-        Ok(command)
-    }
 }
 
 #[binwrite]
@@ -85,6 +79,7 @@ pub struct CommandPacket<T: Command> {
     #[bw(calc(data.len() as u16))]
     pub data_length: u16,
     pub data: Vec<u8>,
+    #[bw(if(header.checksum_present()))]
     #[bw(calc(w.get_u8()))]
     pub checksum: u8,
     _type: PhantomData<T>,
@@ -96,7 +91,7 @@ impl<T: Command> CommandPacket<T> {
             .with_destination(1) // Destination 1 is the boot ROM
             .with_opcode_length(false)
             .with_data_length_present(true) // Always present, simplifies encoding/decoding
-            .with_checksum_present(true) // Always present, ensures integrity
+            .with_checksum_present(true)
             .with_reply_requested(true) // Always present, simplifies encoding/decoding
             .with_read_command(T::READ_COMMAND);
 
@@ -109,6 +104,16 @@ impl<T: Command> CommandPacket<T> {
             data: data.into_inner(),
             _type: PhantomData,
         })
+    }
+
+    pub fn set_destination(mut self, destination: u8) -> Self {
+        self.header.set_destination(destination);
+        self
+    }
+
+    pub fn set_checksum_present(mut self, checksum_present: bool) -> Self {
+        self.header.set_checksum_present(checksum_present);
+        self
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
@@ -184,7 +189,7 @@ where
     pub data_length: u16,
     #[br(count = { if header.error() { 1 } else { data_length }})]
     pub data: Vec<u8>,
-    #[br(if(!header.error()))]
+    #[br(if(!header.error() && header.checksum_present()))]
     // FIXME: The observed checksum response on the wire doesn't seem to match
     // the calculated checksum, so skip the checksum verification for now.
     // #[br(assert(checksum == r.get_u8_until_last_byte(), ChecksumMismatchError { expected: checksum, actual: r.get_u8_until_last_byte() }))]
