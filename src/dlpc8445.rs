@@ -114,6 +114,7 @@ impl Dlpc8445Con {
         let command = command
             .into_packet()?
             .set_checksum_present(checksum_present);
+        trace!("Command packet: {:#?}", command);
         let encoded = command.encode()?;
 
         self.writer.write_all(&encoded)?;
