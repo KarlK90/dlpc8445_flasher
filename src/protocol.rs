@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use std::{io::Cursor, marker::PhantomData};
 
 use binrw::{BinRead, BinWrite, Endian, binread, binwrite, helpers::until_eof};

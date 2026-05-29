@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 pub mod dlpc8445;
 pub mod flash;
 pub mod protocol;
