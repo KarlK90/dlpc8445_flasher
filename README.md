@@ -6,7 +6,6 @@ USB flash programmer for the Texas Instruments DLP Controller (DLPC8445), enabli
 - **Validate Flash Content**: Verify flash contents match the firmware image
 - **Erase Flash Content**: Force erase all sectors before flashing
 - **USB Resilience**: Automatically resume from connection interruptions without data loss
-- **Robust Error Handling**: Comprehensive error reporting with automatic retry on transient failures
 
 ## How to Use
 
@@ -73,7 +72,8 @@ Write firmware to the device:
 **Behavior**:
 
 - Connects to device and verifies flash mode (optionally switches with `--enter-flash-mode`)
-- Iterates through image sectors:
+- Invalidates header sector of the flash image
+- Iterates through image sectors in reverse:
   - Skips sectors that already match the image (checksum validation)
   - Erases mismatched sectors
   - Flashes new data
@@ -109,12 +109,7 @@ The tool handles several error conditions:
 1. **USB Disconnection**
    - Automatically resumes from the last completed sector
 
-2. **Communication Errors**
-   - Automatically retries on checksum mismatches
-   - Retries on buffer full conditions
-   - Reports non-recoverable errors with details
-
-3. **Device Mode Issues**
+2. **Device Mode Issues**
    - Reports if device is in wrong mode
    - Suggests `--enter-flash-mode` flag
    - Verifies mode switch completion
