@@ -4,7 +4,6 @@
 use std::{
     io::{self, Write},
     path::PathBuf,
-    time::Duration,
 };
 
 use anyhow::{Result, bail};
@@ -63,7 +62,7 @@ fn main() -> Result<()> {
             Err(Dlpc8445Error::UsbDisconnected) => {
                 warn!("DLPC8445 disconnected");
                 flash_state.reset_current_sector();
-                std::thread::sleep(Duration::from_millis(250));
+                info!("Waiting for device to reconnect...");
             }
             Err(err) => {
                 error!("{}", err);
@@ -79,8 +78,7 @@ fn main() -> Result<()> {
 
 fn confirm_enter_flash_mode() -> Result<()> {
     warn!(
-        "WARNING: --enter-flash-mode switches the DLPC8445 from application mode to bootrom, \
-which invalidates the image currently found on flash."
+        "WARNING: --enter-flash-mode switches the DLPC8445 from application mode to bootrom, which invalidates the image currently found on flash."
     );
     warn!(
         "You must flash a valid image immediately after entering flash mode, or the device may not boot."
