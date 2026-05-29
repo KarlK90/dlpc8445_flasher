@@ -2,6 +2,9 @@ pub mod dlpc8445;
 pub mod flash;
 pub mod protocol;
 
+use std::fmt::Display;
+
+use nusb::{ErrorKind, transfer::TransferError};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Dlpc8445Error>;
@@ -17,43 +20,45 @@ pub enum Dlpc8445Error {
 }
 
 impl Dlpc8445Error {
-    pub fn general(message: impl Into<String>) -> Self {
-        Self::General(message.into())
+    pub fn general(message: impl Display) -> Self {
+        Self::General(message.to_string())
     }
 }
 
 impl From<std::io::Error> for Dlpc8445Error {
-    fn from(value: std::io::Error) -> Self {
+    fn from(err: std::io::Error) -> Self {
         if matches!(
-            value.kind(),
+            err.kind(),
             std::io::ErrorKind::NotConnected
                 | std::io::ErrorKind::ConnectionAborted
                 | std::io::ErrorKind::ConnectionReset
                 | std::io::ErrorKind::BrokenPipe
+                | std::io::ErrorKind::Interrupted
+                | std::io::ErrorKind::TimedOut
         ) {
             Self::UsbDisconnected
         } else {
-            Self::general(value.to_string())
+            Self::general(err)
         }
     }
 }
 
 impl From<nusb::Error> for Dlpc8445Error {
-    fn from(value: nusb::Error) -> Self {
-        if value.kind() == nusb::ErrorKind::Disconnected {
+    fn from(err: nusb::Error) -> Self {
+        if err.kind() == ErrorKind::Disconnected {
             Self::UsbDisconnected
         } else {
-            Self::general(value.to_string())
+            Self::general(err)
         }
     }
 }
 
 impl From<nusb::transfer::TransferError> for Dlpc8445Error {
-    fn from(value: nusb::transfer::TransferError) -> Self {
-        if matches!(value, nusb::transfer::TransferError::Disconnected) {
+    fn from(err: nusb::transfer::TransferError) -> Self {
+        if matches!(err, TransferError::Disconnected | TransferError::Cancelled) {
             Self::UsbDisconnected
         } else {
-            Self::general(value.to_string())
+            Self::general(err)
         }
     }
 }
