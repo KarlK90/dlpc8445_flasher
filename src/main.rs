@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Result, bail};
 use clap::Parser;
+use git_version::git_version;
 use log::{error, info, warn};
 
 use dlpc8445_proto::{
@@ -35,6 +36,13 @@ fn main() -> Result<()> {
         .filter_level(log::LevelFilter::Info)
         .parse_default_env()
         .init();
+
+    info!(
+        "{} - version {} - {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        git_version!()
+    );
 
     let args = Ops::parse();
     let mut flash_state = FlashState::from_image(&args.file)?;
