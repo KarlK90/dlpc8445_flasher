@@ -134,6 +134,16 @@ impl Dlpc8445Con {
     pub fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
         self.unlock_flash()?;
 
+        if flash_state.header_sector_needs_invalidation() {
+            info!("Erasing first sector on flash to invalidate image");
+            let header = flash_state.header_sector();
+            self.erase_sector(header)?;
+            info!(
+                "Flashing sectors in reverse (from last to first) to ensure boot rom fallback for partial flashed images"
+            );
+            flash_state.reverse();
+        }
+
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
 

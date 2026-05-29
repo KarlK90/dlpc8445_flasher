@@ -8,6 +8,7 @@ use crate::{Dlpc8445Error, Result, fletcher_64};
 pub struct FlashState {
     current_sector: usize,
     sectors: Vec<FlashSector>,
+    is_reversed: bool,
 }
 
 // As per DLPC8445 datasheet (DLPS253C): "Table 6-11. Feature Requirements for
@@ -50,6 +51,9 @@ impl FlashState {
         info!("Loading image from {}", path.as_ref().display());
         let image = std::fs::read(&path)?;
 
+        if image.is_empty() {
+            return Err(Dlpc8445Error::general("flash image cannot be empty"));
+        }
         if !image.len().is_multiple_of(4) {
             return Err(Dlpc8445Error::general(format!(
                 "flash image size must be a multiple of 4 bytes, got {}",
@@ -83,7 +87,31 @@ impl FlashState {
         Ok(FlashState {
             current_sector: 0,
             sectors,
+            is_reversed: false,
         })
+    }
+
+    pub fn reverse(&mut self) {
+        if !self.is_reversed {
+            self.sectors.reverse();
+            self.is_reversed = true;
+        }
+    }
+
+    pub fn header_sector_needs_invalidation(&mut self) -> bool {
+        if self.current_sector != 0 {
+            // flashing already started
+            return false;
+        }
+
+        !self.header_sector().erased
+    }
+
+    pub fn header_sector(&mut self) -> &mut FlashSector {
+        self.sectors
+            .iter_mut()
+            .find(|sector| sector.idx == 0)
+            .expect("flash image must have at least one sector")
     }
 }
 
