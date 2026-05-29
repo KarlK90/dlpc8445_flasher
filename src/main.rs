@@ -46,10 +46,6 @@ fn main() -> Result<()> {
     info!("Waiting for device...");
 
     loop {
-        if flash_state.is_done() {
-            break;
-        }
-
         let mut dlpc = Dlpc8445Con::wait_for_device()?;
 
         match run_session(&mut dlpc, &mut flash_state, &args) {
@@ -62,16 +58,12 @@ fn main() -> Result<()> {
                 error!("{}", err);
                 return Err(err.into());
             }
-            _ => {}
+            Ok(msg) => {
+                info!("{msg}");
+                return Ok(());
+            }
         }
     }
-
-    if args.flash {
-        info!("Flash programming complete");
-    } else {
-        info!("Flash validation complete");
-    }
-    Ok(())
 }
 
 fn confirm_enter_flash_mode() -> Result<()> {
@@ -102,7 +94,7 @@ fn run_session(
     dlpc: &mut Dlpc8445Con,
     flash_state: &mut FlashState,
     args: &Ops,
-) -> std::result::Result<(), Dlpc8445Error> {
+) -> std::result::Result<String, Dlpc8445Error> {
     dlpc.verify_flash_mode(args.enter_flash_mode)?;
 
     let dlpc_info = dlpc.query_info()?;

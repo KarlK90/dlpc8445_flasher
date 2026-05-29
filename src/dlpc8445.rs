@@ -30,7 +30,7 @@ use crate::{
 
 const VENDOR_ID: u16 = 0x0451;
 const PRODUCT_ID: u16 = 0x8430;
-const MAX_PAGE_REPROGRAM_ATTEMPTS: usize = 3;
+const MAX_SECTOR_REPROGRAM_ATTEMPTS: usize = 3;
 
 pub struct Dlpc8445Con {
     writer: EndpointWrite<Bulk>,
@@ -131,7 +131,7 @@ impl Dlpc8445Con {
             .and_then(|resp| R::decode(resp.data))
     }
 
-    pub fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
+    pub fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
         self.unlock_flash()?;
 
         if flash_state.header_sector_needs_invalidation() {
@@ -149,7 +149,7 @@ impl Dlpc8445Con {
 
             if self.validate_sector(sector).is_ok() {
                 info!(
-                    "Sector {} at 0x{:08X} already matches image; skipping",
+                    "Sector {} at 0x{:08X} already matches image",
                     sector.idx, sector.start_addr
                 );
 
@@ -187,17 +187,17 @@ impl Dlpc8445Con {
                 );
 
                 if let Err(err) = self.validate_sector(sector) {
-                    if reprogram_attempts >= MAX_PAGE_REPROGRAM_ATTEMPTS {
+                    if reprogram_attempts >= MAX_SECTOR_REPROGRAM_ATTEMPTS {
                         return Err(Dlpc8445Error::general(format!(
-                            "validation failed for sector {} after {} reprogram attempts: {}",
-                            sector.idx, MAX_PAGE_REPROGRAM_ATTEMPTS, err
+                            "Validation failed for sector {} after {} reprogram attempts: {}",
+                            sector.idx, MAX_SECTOR_REPROGRAM_ATTEMPTS, err
                         )));
                     }
 
                     reprogram_attempts += 1;
                     warn!(
                         "Validation failed for sector {}; erasing and reprogramming (attempt {}/{})",
-                        sector.idx, reprogram_attempts, MAX_PAGE_REPROGRAM_ATTEMPTS
+                        sector.idx, reprogram_attempts, MAX_SECTOR_REPROGRAM_ATTEMPTS
                     );
                     sector.reset();
                 }
@@ -208,10 +208,10 @@ impl Dlpc8445Con {
         }
 
         self.send_command(WriteUnlockFlashForUpdateCommand::lock())?;
-        Ok(())
+        Ok("Flash programming complete!".to_string())
     }
 
-    pub fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
+    pub fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
 
@@ -229,8 +229,7 @@ impl Dlpc8445Con {
         );
 
         if total == valid {
-            info!("{msg}");
-            return Ok(());
+            Ok(msg)
         } else {
             Err(Dlpc8445Error::general(msg))
         }
@@ -337,13 +336,16 @@ impl Dlpc8445Con {
     }
 
     pub fn verify_flash_mode(&mut self, enter_flash_mode: bool) -> Result<()> {
-        let current_mode = self.send_command(ReadModeCommand)?;
+        let current_mode = self.send_command(ReadModeCommand)?.application_mode();
 
-        if current_mode.application_mode() == ApplicationMode::MainApplication {
+        if !matches!(
+            current_mode,
+            ApplicationMode::BootRom | ApplicationMode::SecondaryBootApplication
+        ) {
             if enter_flash_mode {
                 info!(
                     "Switching to flash mode... (current mode: {})",
-                    current_mode.application_mode()
+                    current_mode
                 );
                 self.send_command(WriteSwitchApplicationCommand::new(
                     SwitchApplicationOption::BootApplication,
@@ -352,37 +354,33 @@ impl Dlpc8445Con {
                 // Give device time to switch modes
                 std::thread::sleep(Duration::from_secs(2));
 
-                let current_mode = self.send_command(ReadModeCommand)?;
-                if current_mode.application_mode() != ApplicationMode::BootRom
-                    && current_mode.application_mode() != ApplicationMode::SecondaryBootApplication
-                {
+                let current_mode = self.send_command(ReadModeCommand)?.application_mode();
+
+                if !matches!(
+                    current_mode,
+                    ApplicationMode::BootRom | ApplicationMode::SecondaryBootApplication
+                ) {
                     return Err(Dlpc8445Error::general(format!(
                         "Failed to switch to flash mode after mode switch command (current mode: {})",
-                        current_mode.application_mode(),
+                        current_mode
                     )));
                 }
 
-                info!(
-                    "Successfully switched to flash mode ({})",
-                    current_mode.application_mode()
-                );
+                info!("Successfully switched to flash mode ({})", current_mode);
             } else {
                 return Err(Dlpc8445Error::general(format!(
                     "Device is not in flash mode (current mode: {}). Use --enter-flash-mode to switch.",
-                    current_mode.application_mode()
+                    current_mode
                 )));
             }
         } else {
-            info!(
-                "Device is in flash mode (current mode: {})",
-                current_mode.application_mode()
-            );
+            info!("Device is in flash mode (current mode: {})", current_mode);
         }
 
         Ok(())
     }
 
-    pub fn erase_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
+    pub fn erase_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
         self.unlock_flash()?;
 
         while !flash_state.is_done() {
@@ -392,14 +390,9 @@ impl Dlpc8445Con {
                 sector.idx, sector.start_addr
             );
             self.erase_sector(sector)?;
-            info!(
-                "Done erasing sector {} at 0x{:08X}",
-                sector.idx, sector.start_addr
-            );
+            info!("Done erasing sector {}", sector.idx);
             flash_state.advance_sector();
         }
-        info!("All sectors erased successfully");
-
-        Ok(())
+        Ok("All sectors erased successfully".to_string())
     }
 }
