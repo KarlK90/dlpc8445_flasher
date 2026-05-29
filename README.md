@@ -10,7 +10,7 @@ USB flash programmer for the Texas Instruments DLP Controller (DLPC8445), enabli
 ## How to Use
 
 > [!CAUTION]
-> **Only tested on Linux, but should work on macOS and Windows with USB support.**  
+> **Only tested on Linux and Windows, but should work on macOS**  
 > **Use at your own risk:** Flashing firmware can permanently brick your device. You are fully responsible for any damage or data loss.
 
 ### Building from Source
