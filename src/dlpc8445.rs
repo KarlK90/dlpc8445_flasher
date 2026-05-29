@@ -135,7 +135,7 @@ impl Dlpc8445Con {
         self.unlock_flash()?;
 
         while !flash_state.is_done() {
-            let sector = &mut flash_state.sectors[flash_state.current_sector];
+            let sector = flash_state.current_sector();
 
             if self.validate_sector(sector).is_ok() {
                 info!(
@@ -203,7 +203,7 @@ impl Dlpc8445Con {
 
     pub fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<()> {
         while !flash_state.is_done() {
-            let sector = &mut flash_state.sectors[flash_state.current_sector];
+            let sector = flash_state.current_sector();
             let image_checksum = sector.checksum;
             let flash_checksum = self.read_sector_checksum(sector)?.as_u64();
 
@@ -376,7 +376,7 @@ impl Dlpc8445Con {
         self.unlock_flash()?;
 
         while !flash_state.is_done() {
-            let sector = &mut flash_state.sectors[flash_state.current_sector];
+            let sector = flash_state.current_sector();
             info!(
                 "Erasing sector {} at 0x{:08X}",
                 sector.idx, sector.start_addr

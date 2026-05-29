@@ -6,8 +6,8 @@ use crate::{Dlpc8445Error, Result, fletcher_64};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlashState {
-    pub current_sector: usize,
-    pub sectors: Vec<FlashSector>,
+    current_sector: usize,
+    sectors: Vec<FlashSector>,
 }
 
 // As per DLPC8445 datasheet (DLPS253C): "Table 6-11. Feature Requirements for
@@ -29,13 +29,21 @@ impl FlashState {
         self.current_sector += 1;
     }
 
+    pub fn current_sector(&mut self) -> &mut FlashSector {
+        &mut self.sectors[self.current_sector]
+    }
+
     pub fn reset_current_sector(&mut self) {
-        let sector = &mut self.sectors[self.current_sector];
+        let sector = self.current_sector();
         warn!(
             "Interrupted on sector {}; restarting from 0x{:08X}",
             sector.idx, sector.start_addr
         );
         sector.reset();
+    }
+
+    pub fn sectors(&self) -> &Vec<FlashSector> {
+        &self.sectors
     }
 
     pub fn from_image(path: impl AsRef<Path>) -> Result<Self> {

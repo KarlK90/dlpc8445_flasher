@@ -54,11 +54,8 @@ fn main() -> Result<()> {
 
         match run_session(&mut dlpc, &mut flash_state, &args) {
             Err(Dlpc8445Error::UsbDisconnected) => {
+                warn!("DLPC8445 disconnected");
                 flash_state.reset_current_sector();
-                warn!(
-                    "DLPC8445 disconnected; resuming from page {} after reconnect",
-                    flash_state.current_sector
-                );
                 std::thread::sleep(Duration::from_millis(250));
             }
             Err(err) => {
@@ -117,14 +114,14 @@ fn run_session(
     }
 
     info!(
-        "boot_hold_reason={} flash_id={{manufacturer: 0x{:02X}, device: 0x{:02X}, capacity: 0x{:04X}}} sector_size={} current_sector={}/{}",
+        "boot_hold_reason={} flash_id={{manufacturer: 0x{:02X}, device: 0x{:02X}, capacity: 0x{:04X}}} sector_size={} current_sector={current}/{total}",
         dlpc_info.boot_hold_reason.reason,
         dlpc_info.flash_id.manufacturer,
         dlpc_info.flash_id.device,
         dlpc_info.flash_id.capacity,
         dlpc_info.flash_sector.sector_size,
-        flash_state.current_sector,
-        flash_state.sectors.len()
+        total = flash_state.sectors().len(),
+        current = flash_state.current_sector().idx,
     );
 
     if args.erase {
