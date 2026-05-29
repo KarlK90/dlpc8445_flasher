@@ -65,13 +65,12 @@ impl Dlpc8445Con {
         let writer = interface
             .endpoint::<Bulk, Out>(0x01)?
             .writer(512)
-            .with_write_timeout(Duration::from_millis(500))
-            .with_num_transfers(1);
+            .with_write_timeout(Duration::from_millis(500));
 
         let reader = interface
             .endpoint::<Bulk, In>(0x81)?
             .reader(512)
-            .with_num_transfers(1);
+            .with_read_timeout(Duration::from_secs(1));
 
         Ok(Self { writer, reader })
     }
