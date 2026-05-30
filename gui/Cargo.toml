@@ -1,0 +1,11 @@
+[package]
+name = "dlpc8445_flasher_gui"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "dlpc8445_flasher_gui"
+path = "src/main.rs"
+
+[dependencies]
+dioxus = { version = "0.7", features = ["web"] }

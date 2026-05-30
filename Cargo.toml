@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "gui"]
+resolver = "3"
+
 [package]
 authors = ["Stefan Kerkmann"]
 name = "dlpc8445_flasher"
