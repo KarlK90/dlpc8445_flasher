@@ -34,6 +34,33 @@ cargo build --release
 # target/release/dlpc8445_flasher
 ```
 
+### Starting the CLI in a Terminal Window
+
+After downloading a release or building from source, open a terminal, change to the folder that contains the executable, and run `--help` to confirm it starts correctly.
+
+#### Linux
+
+```bash
+cd /path/to/folder
+./dlpc8445_flasher --help
+```
+
+#### Windows
+
+In **PowerShell** or **Command Prompt**:
+
+```powershell
+cd C:\path\to\folder
+.\dlpc8445_flasher.exe --help
+```
+
+#### macOS
+
+```bash
+cd /path/to/folder
+./dlpc8445_flasher --help
+```
+
 ### Command-Line Interface
 
 #### Basic Help
