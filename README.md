@@ -13,6 +13,11 @@ USB flash programmer for the Texas Instruments DLP Controller (DLPC8445), enabli
 > **Only tested on Linux and Windows, but should work on macOS**  
 > **Use at your own risk:** Flashing firmware can permanently brick your device. You are fully responsible for any damage or data loss.
 
+### Download
+
+Pre-built binaries are available for all major operating systems for all releases, just download them from the [release page](https://github.com/KarlK90/dlpc8445_flasher/releases/latest
+).
+
 ### Building from Source
 
 Install Rust and Cargo (e.g. via [rustup](https://rustup.rs/)), then clone the repository and build the binary:
