@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
 
-use std::{
-    io::{Read, Write},
-    time::Duration,
-};
+use std::time::Duration;
 
 use log::{error, info, trace, warn};
 use nusb::{
-    MaybeFuture,
     io::{EndpointRead, EndpointWrite},
     transfer::{Bulk, In, Out},
 };
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     Dlpc8445Error, Result,
@@ -49,10 +46,10 @@ pub struct Dlpc8445Info {
 }
 
 impl Dlpc8445Con {
-    pub fn wait_for_device() -> Result<Self> {
+    pub async fn wait_for_device() -> Result<Self> {
         let di = loop {
             let device = nusb::list_devices()
-                .wait()?
+                .await?
                 .find(|d| d.vendor_id() == VENDOR_ID && d.product_id() == PRODUCT_ID);
 
             if let Some(device) = device {
@@ -60,11 +57,11 @@ impl Dlpc8445Con {
                 break device;
             }
 
-            std::thread::sleep(Duration::from_millis(100));
+            tokio::time::sleep(Duration::from_millis(100)).await;
         };
 
-        let device = di.open().wait()?;
-        let interface = device.claim_interface(0).wait()?;
+        let device = di.open().await?;
+        let interface = device.claim_interface(0).await?;
 
         let writer = interface
             .endpoint::<Bulk, Out>(0x01)?
@@ -83,11 +80,13 @@ impl Dlpc8445Con {
         })
     }
 
-    pub fn query_info(&mut self) -> Result<&Dlpc8445Info> {
-        let boot_hold_reason = self.send_command(ReadBootHoldReasonCommand)?;
-        let flash_info = self.send_command(ReadFlashIdCommand)?;
-        let flash_sector_info = self.send_command(ReadGetFlashSectorInformationCommand)?;
-        let mode = self.send_command(ReadModeCommand)?.application_mode();
+    pub async fn query_info(&mut self) -> Result<&Dlpc8445Info> {
+        let boot_hold_reason = self.send_command(ReadBootHoldReasonCommand).await?;
+        let flash_info = self.send_command(ReadFlashIdCommand).await?;
+        let flash_sector_info = self
+            .send_command(ReadGetFlashSectorInformationCommand)
+            .await?;
+        let mode = self.send_command(ReadModeCommand).await?.application_mode();
 
         self.info = Some(Dlpc8445Info {
             boot_hold_reason,
@@ -101,7 +100,7 @@ impl Dlpc8445Con {
             .ok_or_else(|| Dlpc8445Error::general("failed to query device info"))
     }
 
-    pub fn send_command<T, R>(&mut self, command: T) -> Result<R>
+    pub async fn send_command<T, R>(&mut self, command: T) -> Result<R>
     where
         T: Command<ResponsePacket<R> = ResponsePacket<R>>,
         R: ResponsePayload,
@@ -120,12 +119,12 @@ impl Dlpc8445Con {
         trace!("Command packet: {:#?}", command);
         let encoded = command.encode()?;
 
-        self.writer.write_all(&encoded)?;
-        self.writer.flush_end()?;
+        self.writer.write_all(&encoded).await?;
+        self.writer.flush_end_async().await?;
 
         let mut response = Vec::new();
         let mut reader = self.reader.until_short_packet();
-        reader.read_to_end(&mut response)?;
+        reader.read_to_end(&mut response).await?;
         reader
             .consume_end()
             .map_err(|err| Dlpc8445Error::general(err.to_string()))?;
@@ -135,13 +134,13 @@ impl Dlpc8445Con {
             .and_then(|resp| R::decode(resp.data))
     }
 
-    pub fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
-        self.unlock_flash()?;
+    pub async fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
+        self.unlock_flash().await?;
 
         if flash_state.header_sector_needs_invalidation() {
             info!("Erasing first sector on flash to invalidate image");
             let header = flash_state.header_sector();
-            self.erase_sector(header)?;
+            self.erase_sector(header).await?;
             info!(
                 "Flashing sectors in reverse (from last to first) to ensure boot rom fallback for partial flashed images"
             );
@@ -151,7 +150,7 @@ impl Dlpc8445Con {
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
 
-            if self.validate_sector(sector).is_ok() {
+            if self.validate_sector(sector).await.is_ok() {
                 info!(
                     "Sector {} at 0x{:08X} already matches image",
                     sector.idx, sector.start_addr
@@ -174,7 +173,7 @@ impl Dlpc8445Con {
                         "Erasing sector {} at 0x{:08X}",
                         sector.idx, sector.start_addr
                     );
-                    self.erase_sector(sector)?;
+                    self.erase_sector(sector).await?;
                 }
 
                 if !sector.is_programmed() {
@@ -182,7 +181,7 @@ impl Dlpc8445Con {
                         "Programming sector {} at 0x{:08X}",
                         sector.idx, sector.start_addr,
                     );
-                    self.program_sector(sector)?;
+                    self.program_sector(sector).await?;
                 }
 
                 info!(
@@ -190,7 +189,7 @@ impl Dlpc8445Con {
                     sector.idx, sector.start_addr, sector.end_addr
                 );
 
-                if let Err(err) = self.validate_sector(sector) {
+                if let Err(err) = self.validate_sector(sector).await {
                     if reprogram_attempts >= MAX_SECTOR_REPROGRAM_ATTEMPTS {
                         return Err(Dlpc8445Error::general(format!(
                             "Validation failed for sector {} after {} reprogram attempts: {}",
@@ -211,15 +210,16 @@ impl Dlpc8445Con {
             flash_state.advance_sector();
         }
 
-        self.send_command(WriteUnlockFlashForUpdateCommand::lock())?;
+        self.send_command(WriteUnlockFlashForUpdateCommand::lock())
+            .await?;
         Ok("Flash programming complete!".to_string())
     }
 
-    pub fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
+    pub async fn validation_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
 
-            match self.validate_sector(sector) {
+            match self.validate_sector(sector).await {
                 Ok(_) => info!("Sector {}: valid", sector.idx),
                 Err(err) => error!("Sector {}: invalid {err}", sector.idx),
             }
@@ -239,9 +239,10 @@ impl Dlpc8445Con {
         }
     }
 
-    fn unlock_flash(&mut self) -> Result<()> {
-        self.send_command(WriteUnlockFlashForUpdateCommand::unlock())?;
-        let unlock_state = self.send_command(ReadUnlockFlashForUpdateCommand)?;
+    async fn unlock_flash(&mut self) -> Result<()> {
+        self.send_command(WriteUnlockFlashForUpdateCommand::unlock())
+            .await?;
+        let unlock_state = self.send_command(ReadUnlockFlashForUpdateCommand).await?;
 
         if !unlock_state.is_unlocked() {
             return Err(Dlpc8445Error::general(
@@ -251,7 +252,7 @@ impl Dlpc8445Con {
         Ok(())
     }
 
-    fn initialize_flash_rw(&mut self, start_address: usize, num_bytes: usize) -> Result<()> {
+    async fn initialize_flash_rw(&mut self, start_address: usize, num_bytes: usize) -> Result<()> {
         let command = WriteInitializeFlashReadWriteSettingsCommand {
             start_address: start_address.try_into().map_err(|_| {
                 Dlpc8445Error::general(format!(
@@ -265,16 +266,17 @@ impl Dlpc8445Con {
             })?,
         };
 
-        self.send_command(command)?;
+        self.send_command(command).await?;
         Ok(())
     }
 
-    fn program_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
+    async fn program_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
         if sector.remaining() == 0 {
             return Ok(());
         }
 
-        self.initialize_flash_rw(sector.start_addr + sector.current_addr, sector.remaining())?;
+        self.initialize_flash_rw(sector.start_addr + sector.current_addr, sector.remaining())
+            .await?;
 
         while sector.current_addr < sector.len() {
             let next_pos = (sector.current_addr + FLASH_PAGE_SIZE).min(sector.len());
@@ -282,30 +284,32 @@ impl Dlpc8445Con {
 
             self.send_command(FlashWriteCommand {
                 data: chunk.to_vec(),
-            })?;
-            std::thread::sleep(FLASH_PAGE_PROGRAM_TIME);
+            })
+            .await?;
+            tokio::time::sleep(FLASH_PAGE_PROGRAM_TIME).await;
             sector.current_addr = next_pos;
         }
 
         Ok(())
     }
 
-    fn erase_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
+    async fn erase_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
         let sector_address = sector.start_addr.try_into().map_err(|_| {
             Dlpc8445Error::general(format!(
                 "flash sector start address 0x{:08X} does not fit into u32",
                 sector.start_addr
             ))
         })?;
-        self.send_command(WriteEraseSectorCommand::new(sector_address))?;
-        std::thread::sleep(FLASH_SECTOR_ERASE_TIME);
+        self.send_command(WriteEraseSectorCommand::new(sector_address))
+            .await?;
+        tokio::time::sleep(FLASH_SECTOR_ERASE_TIME).await;
         sector.mark_erased();
         Ok(())
     }
 
-    fn validate_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
+    async fn validate_sector(&mut self, sector: &mut FlashSector) -> Result<()> {
         let image_checksum = sector.checksum;
-        let flash_checksum = self.read_sector_checksum(sector)?.as_u64();
+        let flash_checksum = self.read_sector_checksum(sector).await?.as_u64();
 
         if flash_checksum != image_checksum {
             return Err(Dlpc8445Error::general(format!(
@@ -319,7 +323,7 @@ impl Dlpc8445Con {
         Ok(())
     }
 
-    fn read_sector_checksum(&mut self, sector: &FlashSector) -> Result<ChecksumResponse> {
+    async fn read_sector_checksum(&mut self, sector: &FlashSector) -> Result<ChecksumResponse> {
         let start_address = sector.start_addr.try_into().map_err(|_| {
             Dlpc8445Error::general(format!(
                 "flash start address 0x{:08X} does not fit into u32",
@@ -337,10 +341,11 @@ impl Dlpc8445Con {
             start_address,
             num_bytes,
         })
+        .await
     }
 
-    pub fn verify_flash_mode(&mut self, enter_flash_mode: bool) -> Result<()> {
-        let current_mode = self.send_command(ReadModeCommand)?.application_mode();
+    pub async fn verify_flash_mode(&mut self, enter_flash_mode: bool) -> Result<()> {
+        let current_mode = self.send_command(ReadModeCommand).await?.application_mode();
 
         if !matches!(
             current_mode,
@@ -353,12 +358,13 @@ impl Dlpc8445Con {
                 );
                 self.send_command(WriteSwitchApplicationCommand::new(
                     SwitchApplicationOption::BootApplication,
-                ))?;
+                ))
+                .await?;
 
                 // Give device time to switch modes
-                std::thread::sleep(Duration::from_secs(2));
+                tokio::time::sleep(Duration::from_secs(2)).await;
 
-                let current_mode = self.send_command(ReadModeCommand)?.application_mode();
+                let current_mode = self.send_command(ReadModeCommand).await?.application_mode();
 
                 if !matches!(
                     current_mode,
@@ -384,8 +390,8 @@ impl Dlpc8445Con {
         Ok(())
     }
 
-    pub fn erase_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
-        self.unlock_flash()?;
+    pub async fn erase_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
+        self.unlock_flash().await?;
 
         while !flash_state.is_done() {
             let sector = flash_state.current_sector();
@@ -393,7 +399,7 @@ impl Dlpc8445Con {
                 "Erasing sector {} at 0x{:08X}",
                 sector.idx, sector.start_addr
             );
-            self.erase_sector(sector)?;
+            self.erase_sector(sector).await?;
             info!("Done erasing sector {}", sector.idx);
             flash_state.advance_sector();
         }

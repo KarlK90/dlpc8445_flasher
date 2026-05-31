@@ -50,9 +50,9 @@ impl FlashState {
         &self.sectors
     }
 
-    pub fn from_image(path: impl AsRef<Path>) -> Result<Self> {
+    pub async fn from_image(path: impl AsRef<Path>) -> Result<Self> {
         info!("Loading image from {}", path.as_ref().display());
-        let image = std::fs::read(&path)?;
+        let image = tokio::fs::read(&path).await?;
 
         if image.is_empty() {
             return Err(Dlpc8445Error::general("flash image cannot be empty"));

@@ -33,7 +33,8 @@ struct Ops {
     erase: bool,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     env_logger::Builder::new()
         .filter_level(log::LevelFilter::Info)
         .parse_default_env()
@@ -47,18 +48,18 @@ fn main() -> Result<()> {
     );
 
     let args = Ops::parse();
-    let mut flash_state = FlashState::from_image(&args.file)?;
+    let mut flash_state = FlashState::from_image(&args.file).await?;
 
     if args.enter_flash_mode {
-        confirm_enter_flash_mode()?;
+        confirm_enter_flash_mode().await?;
     }
 
     info!("Waiting for device...");
 
     loop {
-        let mut dlpc = Dlpc8445Con::wait_for_device()?;
+        let mut dlpc = Dlpc8445Con::wait_for_device().await?;
 
-        match run_session(&mut dlpc, &mut flash_state, &args) {
+        match run_session(&mut dlpc, &mut flash_state, &args).await {
             Err(Dlpc8445Error::UsbDisconnected) => {
                 warn!("DLPC8445 disconnected");
                 flash_state.reset_current_sector();
@@ -76,7 +77,9 @@ fn main() -> Result<()> {
     }
 }
 
-fn confirm_enter_flash_mode() -> Result<()> {
+async fn confirm_enter_flash_mode() -> Result<()> {
+    use tokio::io::AsyncBufReadExt as _;
+
     warn!(
         "WARNING: --enter-flash-mode switches the DLPC8445 from application mode to bootrom, which invalidates the image currently found on flash."
     );
@@ -89,7 +92,9 @@ fn confirm_enter_flash_mode() -> Result<()> {
     io::stdout().flush()?;
 
     let mut response = String::new();
-    io::stdin().read_line(&mut response)?;
+    tokio::io::BufReader::new(tokio::io::stdin())
+        .read_line(&mut response)
+        .await?;
 
     let response = response.trim().to_ascii_lowercase();
     if response != "yes" && response != "y" {
@@ -99,14 +104,14 @@ fn confirm_enter_flash_mode() -> Result<()> {
     Ok(())
 }
 
-fn run_session(
+async fn run_session(
     dlpc: &mut Dlpc8445Con,
     flash_state: &mut FlashState,
     args: &Ops,
 ) -> std::result::Result<String, Dlpc8445Error> {
-    dlpc.verify_flash_mode(args.enter_flash_mode)?;
+    dlpc.verify_flash_mode(args.enter_flash_mode).await?;
 
-    let dlpc_info = dlpc.query_info()?;
+    let dlpc_info = dlpc.query_info().await?;
     if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
         return Err(Dlpc8445Error::general(format!(
             "controller reported an invalid flash sector size of {} bytes, expected {}",
@@ -126,10 +131,10 @@ fn run_session(
     );
 
     if args.erase {
-        dlpc.erase_session(flash_state)
+        dlpc.erase_session(flash_state).await
     } else if args.flash {
-        dlpc.flash_session(flash_state)
+        dlpc.flash_session(flash_state).await
     } else {
-        dlpc.validation_session(flash_state)
+        dlpc.validation_session(flash_state).await
     }
 }
