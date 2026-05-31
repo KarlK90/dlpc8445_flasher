@@ -7,6 +7,8 @@ pub mod protocol;
 
 #[cfg(not(target_family = "wasm"))]
 pub mod native;
+#[cfg(target_family = "wasm")]
+pub mod webusb;
 
 use std::fmt::Display;
 
