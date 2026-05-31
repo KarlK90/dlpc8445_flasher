@@ -5,9 +5,11 @@ pub mod dlpc8445;
 pub mod flash;
 pub mod protocol;
 
+#[cfg(not(target_family = "wasm"))]
+pub mod native;
+
 use std::fmt::Display;
 
-use nusb::{ErrorKind, transfer::TransferError};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Dlpc8445Error>;
@@ -39,26 +41,6 @@ impl From<std::io::Error> for Dlpc8445Error {
                 | std::io::ErrorKind::Interrupted
                 | std::io::ErrorKind::TimedOut
         ) {
-            Self::UsbDisconnected
-        } else {
-            Self::general(err)
-        }
-    }
-}
-
-impl From<nusb::Error> for Dlpc8445Error {
-    fn from(err: nusb::Error) -> Self {
-        if err.kind() == ErrorKind::Disconnected {
-            Self::UsbDisconnected
-        } else {
-            Self::general(err)
-        }
-    }
-}
-
-impl From<nusb::transfer::TransferError> for Dlpc8445Error {
-    fn from(err: nusb::transfer::TransferError) -> Self {
-        if matches!(err, TransferError::Disconnected | TransferError::Cancelled) {
             Self::UsbDisconnected
         } else {
             Self::general(err)

@@ -3,12 +3,7 @@
 
 use std::time::Duration;
 
-use log::{error, info, trace, warn};
-use nusb::{
-    io::{EndpointRead, EndpointWrite},
-    transfer::{Bulk, In, Out},
-};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use log::{error, info, warn};
 
 use crate::{
     Dlpc8445Error, Result,
@@ -28,14 +23,25 @@ use crate::{
     },
 };
 
-const VENDOR_ID: u16 = 0x0451;
-const PRODUCT_ID: u16 = 0x8430;
+pub const VENDOR_ID: u16 = 0x0451;
+pub const PRODUCT_ID: u16 = 0x8430;
+pub const BULK_OUT_ENDPOINT: u8 = 0x1;
+pub const BULK_IN_ENDPOINT: u8 = 0x81;
+pub const BULK_MAX_PACKET_SIZE: usize = 512;
 const MAX_SECTOR_REPROGRAM_ATTEMPTS: usize = 3;
 
-pub struct Dlpc8445Con {
-    writer: EndpointWrite<Bulk>,
-    reader: EndpointRead<Bulk>,
+pub struct Dlpc8445Con<T: SendCommand> {
+    inner: T,
     info: Option<Dlpc8445Info>,
+}
+
+pub trait SendCommand {
+    fn send_command<T, R>(&mut self, command: T) -> impl Future<Output = Result<R>>
+    where
+        T: Command<ResponsePacket<R> = ResponsePacket<R>> + Send,
+        R: ResponsePayload;
+
+    fn set_checksum_present(&mut self, checksum_present: bool);
 }
 
 pub struct Dlpc8445Info {
@@ -45,48 +51,42 @@ pub struct Dlpc8445Info {
     pub mode: ApplicationMode,
 }
 
-impl Dlpc8445Con {
-    pub async fn wait_for_device() -> Result<Self> {
-        let di = loop {
-            let device = nusb::list_devices()
-                .await?
-                .find(|d| d.vendor_id() == VENDOR_ID && d.product_id() == PRODUCT_ID);
+impl<T: SendCommand> Dlpc8445Con<T> {
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn wait_for_device() -> Result<Dlpc8445Con<crate::native::NativeConnection>> {
+        Ok(Dlpc8445Con {
+            inner: crate::native::wait_for_device().await?,
+            info: None,
+        })
+    }
 
-            if let Some(device) = device {
-                info!("DLPC8445 device found");
-                break device;
-            }
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        };
-
-        let device = di.open().await?;
-        let interface = device.claim_interface(0).await?;
-
-        let writer = interface
-            .endpoint::<Bulk, Out>(0x01)?
-            .writer(512)
-            .with_write_timeout(Duration::from_millis(500));
-
-        let reader = interface
-            .endpoint::<Bulk, In>(0x81)?
-            .reader(512)
-            .with_read_timeout(Duration::from_secs(1));
-
-        Ok(Self {
-            writer,
-            reader,
+    #[cfg(target_family = "wasm")]
+    pub async fn wait_for_device() -> Result<Dlpc8445Con<crate::webusb::WebUsbConnection>> {
+        Ok(Dlpc8445Con {
+            inner: crate::webusb::wait_for_device().await?,
             info: None,
         })
     }
 
     pub async fn query_info(&mut self) -> Result<&Dlpc8445Info> {
-        let boot_hold_reason = self.send_command(ReadBootHoldReasonCommand).await?;
-        let flash_info = self.send_command(ReadFlashIdCommand).await?;
+        let boot_hold_reason = self.inner.send_command(ReadBootHoldReasonCommand).await?;
+        let flash_info = self.inner.send_command(ReadFlashIdCommand).await?;
         let flash_sector_info = self
+            .inner
             .send_command(ReadGetFlashSectorInformationCommand)
             .await?;
-        let mode = self.send_command(ReadModeCommand).await?.application_mode();
+        let mode = self
+            .inner
+            .send_command(ReadModeCommand)
+            .await?
+            .application_mode();
+
+        // Bug in boot rom, no response if checksum is present!
+        let checksum_present = matches!(
+            mode,
+            ApplicationMode::MainApplication | ApplicationMode::SecondaryBootApplication
+        );
+        self.inner.set_checksum_present(checksum_present);
 
         self.info = Some(Dlpc8445Info {
             boot_hold_reason,
@@ -98,40 +98,6 @@ impl Dlpc8445Con {
         self.info
             .as_ref()
             .ok_or_else(|| Dlpc8445Error::general("failed to query device info"))
-    }
-
-    pub async fn send_command<T, R>(&mut self, command: T) -> Result<R>
-    where
-        T: Command<ResponsePacket<R> = ResponsePacket<R>>,
-        R: ResponsePayload,
-    {
-        trace!("Sending command: {:?}", command);
-        // Bug in boot rom, no response if checksum is present!
-        let checksum_present = self.info.as_ref().is_some_and(|info| {
-            matches!(
-                info.mode,
-                ApplicationMode::MainApplication | ApplicationMode::SecondaryBootApplication
-            )
-        });
-        let command = command
-            .into_packet()?
-            .set_checksum_present(checksum_present);
-        trace!("Command packet: {:#?}", command);
-        let encoded = command.encode()?;
-
-        self.writer.write_all(&encoded).await?;
-        self.writer.flush_end_async().await?;
-
-        let mut response = Vec::new();
-        let mut reader = self.reader.until_short_packet();
-        reader.read_to_end(&mut response).await?;
-        reader
-            .consume_end()
-            .map_err(|err| Dlpc8445Error::general(err.to_string()))?;
-
-        command
-            .decode::<R>(&response)
-            .and_then(|resp| R::decode(resp.data))
     }
 
     pub async fn flash_session(&mut self, flash_state: &mut FlashState) -> Result<String> {
@@ -210,8 +176,7 @@ impl Dlpc8445Con {
             flash_state.advance_sector();
         }
 
-        self.send_command(WriteUnlockFlashForUpdateCommand::lock())
-            .await?;
+        self.lock_flash().await?;
         Ok("Flash programming complete!".to_string())
     }
 
@@ -240,9 +205,13 @@ impl Dlpc8445Con {
     }
 
     async fn unlock_flash(&mut self) -> Result<()> {
-        self.send_command(WriteUnlockFlashForUpdateCommand::unlock())
+        self.inner
+            .send_command(WriteUnlockFlashForUpdateCommand::unlock())
             .await?;
-        let unlock_state = self.send_command(ReadUnlockFlashForUpdateCommand).await?;
+        let unlock_state = self
+            .inner
+            .send_command(ReadUnlockFlashForUpdateCommand)
+            .await?;
 
         if !unlock_state.is_unlocked() {
             return Err(Dlpc8445Error::general(
@@ -250,6 +219,12 @@ impl Dlpc8445Con {
             ));
         }
         Ok(())
+    }
+
+    async fn lock_flash(&mut self) -> Result<()> {
+        self.inner
+            .send_command(WriteUnlockFlashForUpdateCommand::lock())
+            .await
     }
 
     async fn initialize_flash_rw(&mut self, start_address: usize, num_bytes: usize) -> Result<()> {
@@ -266,7 +241,7 @@ impl Dlpc8445Con {
             })?,
         };
 
-        self.send_command(command).await?;
+        self.inner.send_command(command).await?;
         Ok(())
     }
 
@@ -282,10 +257,11 @@ impl Dlpc8445Con {
             let next_pos = (sector.current_addr + FLASH_PAGE_SIZE).min(sector.len());
             let chunk = &sector.data[sector.current_addr..next_pos];
 
-            self.send_command(FlashWriteCommand {
-                data: chunk.to_vec(),
-            })
-            .await?;
+            self.inner
+                .send_command(FlashWriteCommand {
+                    data: chunk.to_vec(),
+                })
+                .await?;
             tokio::time::sleep(FLASH_PAGE_PROGRAM_TIME).await;
             sector.current_addr = next_pos;
         }
@@ -300,7 +276,8 @@ impl Dlpc8445Con {
                 sector.start_addr
             ))
         })?;
-        self.send_command(WriteEraseSectorCommand::new(sector_address))
+        self.inner
+            .send_command(WriteEraseSectorCommand::new(sector_address))
             .await?;
         tokio::time::sleep(FLASH_SECTOR_ERASE_TIME).await;
         sector.mark_erased();
@@ -337,15 +314,20 @@ impl Dlpc8445Con {
             ))
         })?;
 
-        self.send_command(ReadChecksumCommand {
-            start_address,
-            num_bytes,
-        })
-        .await
+        self.inner
+            .send_command(ReadChecksumCommand {
+                start_address,
+                num_bytes,
+            })
+            .await
     }
 
     pub async fn verify_flash_mode(&mut self, enter_flash_mode: bool) -> Result<()> {
-        let current_mode = self.send_command(ReadModeCommand).await?.application_mode();
+        let current_mode = self
+            .inner
+            .send_command(ReadModeCommand)
+            .await?
+            .application_mode();
 
         if !matches!(
             current_mode,
@@ -356,15 +338,20 @@ impl Dlpc8445Con {
                     "Switching to flash mode... (current mode: {})",
                     current_mode
                 );
-                self.send_command(WriteSwitchApplicationCommand::new(
-                    SwitchApplicationOption::BootApplication,
-                ))
-                .await?;
+                self.inner
+                    .send_command(WriteSwitchApplicationCommand::new(
+                        SwitchApplicationOption::BootApplication,
+                    ))
+                    .await?;
 
                 // Give device time to switch modes
                 tokio::time::sleep(Duration::from_secs(2)).await;
 
-                let current_mode = self.send_command(ReadModeCommand).await?.application_mode();
+                let current_mode = self
+                    .inner
+                    .send_command(ReadModeCommand)
+                    .await?
+                    .application_mode();
 
                 if !matches!(
                     current_mode,

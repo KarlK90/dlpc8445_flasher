@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
 
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use log::{info, warn};
 
@@ -50,9 +50,14 @@ impl FlashState {
         &self.sectors
     }
 
-    pub async fn from_image(path: impl AsRef<Path>) -> Result<Self> {
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn from_image(path: impl AsRef<std::path::Path>) -> Result<Self> {
         info!("Loading image from {}", path.as_ref().display());
-        let image = tokio::fs::read(&path).await?;
+        Self::from_buffer(&tokio::fs::read(&path).await?).await
+    }
+
+    pub async fn from_buffer(buffer: impl AsRef<[u8]>) -> Result<Self> {
+        let image = buffer.as_ref();
 
         if image.is_empty() {
             return Err(Dlpc8445Error::general("flash image cannot be empty"));
@@ -64,10 +69,9 @@ impl FlashState {
             )));
         }
         info!(
-            "Using DLPC Image: {} ({} bytes) checksum: {:#X}",
-            path.as_ref().display(),
+            "DLPC image: {} bytes checksum: {:#X}",
             image.len(),
-            fletcher_64(&image)
+            fletcher_64(image)
         );
 
         let sectors = image
