@@ -10,6 +10,10 @@ edition = "2021"
 dioxus = { version = "0.7.1", features = [] }
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 
+# web
+[target.'cfg(target_family = "wasm")'.dependencies]
+webusb-web = "0.5.1"
+
 [features]
 default = ["web"]
 # The feature that are only required for the web = ["dioxus/web"] build target should be optional and only enabled in the web = ["dioxus/web"] feature
