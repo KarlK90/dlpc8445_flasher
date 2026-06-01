@@ -5,10 +5,7 @@ use webusb_web::{OpenUsbDevice, Usb, UsbDeviceFilter};
 
 use crate::{
     Dlpc8445Error, Result,
-    dlpc8445::{
-        BULK_IN_ENDPOINT, BULK_MAX_PACKET_SIZE, BULK_OUT_ENDPOINT, PRODUCT_ID, SendCommand,
-        VENDOR_ID,
-    },
+    dlpc8445::{BULK_MAX_PACKET_SIZE, PRODUCT_ID, SendCommand, VENDOR_ID},
     protocol::{Command, ResponsePacket, ResponsePayload},
 };
 
@@ -32,6 +29,7 @@ pub async fn wait_for_device() -> Result<WebUsbConnection> {
     };
 
     let device = device.open().await?;
+    device.select_configuration(1).await?;
     device.claim_interface(0).await?;
 
     Ok(WebUsbConnection {
@@ -63,13 +61,11 @@ impl SendCommand for WebUsbConnection {
         trace!("Command packet: {:#?}", command);
         let encoded = command.encode()?;
 
-        self.device
-            .transfer_out(BULK_OUT_ENDPOINT, &encoded)
-            .await?;
+        self.device.transfer_out(1, &encoded).await?;
 
         let response = self
             .device
-            .transfer_in(BULK_IN_ENDPOINT, BULK_MAX_PACKET_SIZE as u32)
+            .transfer_in(1, BULK_MAX_PACKET_SIZE as u32)
             .await?
             .to_vec();
 
