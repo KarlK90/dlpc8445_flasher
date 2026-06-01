@@ -3,7 +3,7 @@
 [web.app]
 
 # HTML title tag content
-title = "dlpc8445_flasher_gui"
+title = "DLPC 8445 Flasher"
 
 # include `assets` in web platform
 [web.resource]
