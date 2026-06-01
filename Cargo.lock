@@ -202,14 +202,23 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "dlpc8445_flasher"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
- "binrw",
- "bitfield-struct",
  "clap",
+ "dlpc8445_proto",
  "env_logger",
  "git-version",
+ "log",
+ "tokio",
+]
+
+[[package]]
+name = "dlpc8445_proto"
+version = "0.2.3"
+dependencies = [
+ "binrw",
+ "bitfield-struct",
  "log",
  "nusb",
  "strum",
