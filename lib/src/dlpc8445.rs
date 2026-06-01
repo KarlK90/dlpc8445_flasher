@@ -13,6 +13,7 @@ use crate::{
         ReadBootHoldReasonCommand, ReadFlashIdCommand, ReadGetFlashSectorInformationCommand,
         ReadModeCommand, SwitchApplicationOption, WriteSwitchApplicationCommand,
     },
+    sleep,
 };
 use crate::{
     flash::{FLASH_PAGE_PROGRAM_TIME, FLASH_SECTOR_ERASE_TIME, FlashState},
@@ -262,7 +263,7 @@ impl<T: SendCommand> Dlpc8445Con<T> {
                     data: chunk.to_vec(),
                 })
                 .await?;
-            tokio::time::sleep(FLASH_PAGE_PROGRAM_TIME).await;
+            sleep(FLASH_PAGE_PROGRAM_TIME).await;
             sector.current_addr = next_pos;
         }
 
@@ -279,7 +280,7 @@ impl<T: SendCommand> Dlpc8445Con<T> {
         self.inner
             .send_command(WriteEraseSectorCommand::new(sector_address))
             .await?;
-        tokio::time::sleep(FLASH_SECTOR_ERASE_TIME).await;
+        sleep(FLASH_SECTOR_ERASE_TIME).await;
         sector.mark_erased();
         Ok(())
     }
@@ -345,7 +346,7 @@ impl<T: SendCommand> Dlpc8445Con<T> {
                     .await?;
 
                 // Give device time to switch modes
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                sleep(Duration::from_secs(2)).await;
 
                 let current_mode = self
                     .inner

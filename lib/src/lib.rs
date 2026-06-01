@@ -108,3 +108,10 @@ impl<T: binrw::io::Read> binrw::io::Read for Checksum<T> {
         Ok(len)
     }
 }
+
+pub async fn sleep(duration: std::time::Duration) {
+    #[cfg(target_family = "wasm")]
+    gloo_timers::future::sleep(duration).await;
+    #[cfg(not(target_family = "wasm"))]
+    tokio::time::sleep(duration).await;
+}

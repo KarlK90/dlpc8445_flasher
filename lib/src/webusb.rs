@@ -1,7 +1,12 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use std::time::Duration;
 
 use log::{info, trace};
 use webusb_web::{OpenUsbDevice, Usb, UsbDeviceFilter};
+
+use crate::sleep;
 
 use crate::{
     Dlpc8445Error, Result,
@@ -25,7 +30,7 @@ pub async fn wait_for_device() -> Result<WebUsbConnection> {
             break device;
         }
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
     };
 
     let device = device.open().await?;
