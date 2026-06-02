@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use dioxus::prelude::*;
 
 use crate::components::card::{Card, CardContent, CardHeader, CardTitle};
@@ -25,7 +28,7 @@ pub fn HelpInformationCard() -> Element {
                     }
                     li {
                         strong { "Start Flash" }
-                        " - Press \"Start Flash\". If the device is not already in flash mode you will be prompted to confirm the switch."
+                        " - Press \"Start Flash\". If the device is not already in flash mode, you will be prompted to confirm the switch."
                     }
                     li {
                         strong { "Monitor Progress" }

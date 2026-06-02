@@ -28,15 +28,19 @@ pub struct NativeConnection {
     checksum_present: bool,
 }
 
-pub async fn wait_for_device() -> Result<NativeConnection> {
+async fn query_device_impl(wait: bool) -> Result<NativeConnection> {
     let di = loop {
         let device = nusb::list_devices()
             .await?
             .find(|d| d.vendor_id() == VENDOR_ID && d.product_id() == PRODUCT_ID);
 
         if let Some(device) = device {
-            info!("DLPC8445 device found");
+            info!("DLPC 8445 device found");
             break device;
+        }
+
+        if !wait {
+            return Err(Dlpc8445Error::general("No device found!".to_string()));
         }
 
         sleep(Duration::from_millis(100)).await;
@@ -60,6 +64,14 @@ pub async fn wait_for_device() -> Result<NativeConnection> {
         reader,
         checksum_present: false,
     })
+}
+
+pub async fn query_for_device() -> Option<NativeConnection> {
+    query_device_impl(false).await.ok()
+}
+
+pub async fn wait_for_device() -> Result<NativeConnection> {
+    query_device_impl(true).await
 }
 
 impl SendCommand for NativeConnection {

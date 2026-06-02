@@ -1,10 +1,19 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use dioxus::prelude::*;
 use dioxus_primitives::scroll_area::{ScrollArea, ScrollDirection};
 
-use crate::components::card::{Card, CardContent, CardHeader, CardTitle};
+use crate::{
+    LOG_BUFFER_SIZE,
+    components::card::{Card, CardContent, CardHeader, CardTitle},
+    state::Dlpc8445GuiState,
+};
 
 #[component]
 pub fn LogCard() -> Element {
+    let state = use_context::<Dlpc8445GuiState>();
+
     rsx! {
         Card {
             CardHeader {
@@ -22,8 +31,22 @@ pub fn LogCard() -> Element {
                     direction: ScrollDirection::Vertical,
                     tabindex: "0",
                     div {
-                        p { }
+                        class: "font-mono text-xs whitespace-pre-wrap break-all",
+                        for msg in state.logs.read().iter().rev() {
+                            p { key: "{msg.id}", class: "log-entry", "{msg.msg}" }
+                        }
                     }
+                }
+                p {
+                    class: "text-xs mt-2 text-gray-500",
+                    "Only the last {LOG_BUFFER_SIZE} messages are shown. The "
+                    a {
+                        class: "hover:underline",
+                        target: "_blank",
+                        href: "https://developer.chrome.com/docs/devtools/open",
+                        "browser console"
+                    }
+                    " contains the full log."
                 }
             }
         }

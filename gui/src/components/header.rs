@@ -1,10 +1,11 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use dioxus::prelude::*;
-use git_version::git_version;
 
 use crate::components::avatar::{Avatar, AvatarImage, AvatarImageSize};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-const BUILD_COMMIT: &str = git_version!(fallback = "unknown");
 const REPOSITORY_URL: &str = "https://github.com/KarlK90/dlpc8445_flasher";
 const TOOL_AUTHOR: &str = "Stefan Kerkmann";
 const LOGO: Asset = asset!("/assets/logo.svg");
@@ -32,9 +33,10 @@ pub fn Header() -> Element {
             div {
                 a {
                     href: REPOSITORY_URL,
+                    class: "hover:underline",
                     target: "_blank",
                     rel: "noopener noreferrer",
-                    "Version {APP_VERSION} ({BUILD_COMMIT})"
+                    "Version {APP_VERSION}"
                 }
                 span { " by {TOOL_AUTHOR} 2026" }
             }

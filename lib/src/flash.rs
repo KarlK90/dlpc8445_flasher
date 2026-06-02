@@ -5,12 +5,13 @@ use std::time::Duration;
 
 use log::{info, warn};
 
-use crate::{Dlpc8445Error, Result, fletcher_64};
+use crate::{Checksum, Dlpc8445Error, Result, fletcher_64};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlashState {
     current_sector: usize,
     sectors: Vec<FlashSector>,
+    checksum: u64,
     is_reversed: bool,
 }
 
@@ -33,6 +34,10 @@ impl FlashState {
         self.current_sector += 1;
     }
 
+    pub fn current_sector_index(&self) -> usize {
+        self.current_sector
+    }
+
     pub fn current_sector(&mut self) -> &mut FlashSector {
         &mut self.sectors[self.current_sector]
     }
@@ -53,10 +58,10 @@ impl FlashState {
     #[cfg(not(target_family = "wasm"))]
     pub async fn from_image(path: impl AsRef<std::path::Path>) -> Result<Self> {
         info!("Loading image from {}", path.as_ref().display());
-        Self::from_buffer(&tokio::fs::read(&path).await?).await
+        Self::from_buffer(&tokio::fs::read(&path).await?)
     }
 
-    pub async fn from_buffer(buffer: impl AsRef<[u8]>) -> Result<Self> {
+    pub fn from_buffer(buffer: impl AsRef<[u8]>) -> Result<Self> {
         let image = buffer.as_ref();
 
         if image.is_empty() {
@@ -68,10 +73,13 @@ impl FlashState {
                 image.len()
             )));
         }
+
+        let checksum = fletcher_64(image);
+
         info!(
-            "DLPC image: {} bytes checksum: {:#X}",
+            "DLPC image: size {} bytes checksum: {:#X}",
             image.len(),
-            fletcher_64(image)
+            checksum
         );
 
         let sectors = image
@@ -89,12 +97,13 @@ impl FlashState {
             })
             .collect::<Vec<_>>();
 
-        info!("Total flash sectors: {}", sectors.len());
+        info!("DLPC image: total flash sectors: {}", sectors.len());
 
         Ok(FlashState {
             current_sector: 0,
             sectors,
             is_reversed: false,
+            checksum,
         })
     }
 
@@ -102,6 +111,18 @@ impl FlashState {
         if !self.is_reversed {
             self.sectors.reverse();
             self.is_reversed = true;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current_sector = 0;
+        for sector in &mut self.sectors {
+            sector.reset();
+        }
+
+        if self.is_reversed {
+            self.sectors.reverse();
+            self.is_reversed = false;
         }
     }
 
