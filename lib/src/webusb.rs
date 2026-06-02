@@ -43,14 +43,22 @@ pub async fn wait_for_device() -> Result<WebUsbConnection> {
     })
 }
 
-pub async fn request_device_access() -> Result<()> {
+pub async fn request_device_access() -> Result<WebUsbConnection> {
     let usb = Usb::new()?;
-    let _ = usb
+    let device = usb
         .request_device([UsbDeviceFilter::new()
             .with_vendor_id(VENDOR_ID)
             .with_product_id(PRODUCT_ID)])
         .await?;
-    Ok(())
+
+    let device = device.open().await?;
+    device.select_configuration(1).await?;
+    device.claim_interface(0).await?;
+
+    Ok(WebUsbConnection {
+        device,
+        checksum_present: false,
+    })
 }
 
 impl SendCommand for WebUsbConnection {
