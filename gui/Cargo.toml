@@ -1,14 +1,21 @@
 [package]
 name = "dlpc8445_flasher_gui"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Stefan Kerkmann <karlk90@pm.me>"]
 edition = "2024"
 
 [dependencies]
+anyhow = "*"
 dioxus = { version = "0.7.1", features = [] }
 dioxus-icons = { version = "0.1.0", default-features = false }
 dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false }
 git-version = "0.3.9"
+dlpc8445_proto = { path = "../lib" }
+tracing = "0.1.44"
+tracing-log = "0.2.0"
+tokio = { version = "1.52.3", features = ["sync"] }
+log = "0.4.31"
+web-sys = { version = "0.3.99", features = ["console"] }
 
 # web
 [target.'cfg(target_family = "wasm")'.dependencies]

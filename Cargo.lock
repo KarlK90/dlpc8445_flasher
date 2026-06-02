@@ -1652,7 +1652,7 @@ dependencies = [
 
 [[package]]
 name = "dlpc8445_flasher"
-version = "0.2.3"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1665,19 +1665,27 @@ dependencies = [
 
 [[package]]
 name = "dlpc8445_flasher_gui"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
+ "anyhow",
  "dioxus",
  "dioxus-icons",
  "dioxus-primitives",
+ "dlpc8445_proto",
  "git-version",
+ "log",
+ "tokio",
+ "tracing",
+ "tracing-log",
+ "web-sys",
  "webusb-web",
 ]
 
 [[package]]
 name = "dlpc8445_proto"
-version = "0.2.3"
+version = "0.4.0"
 dependencies = [
+ "anyhow",
  "binrw",
  "bitfield-struct",
  "gloo-timers 0.4.0",
@@ -3214,9 +3222,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.30"
+version = "0.4.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "616ec5685824bcc94416c6d4a7a446eea774a31efd7062c8480ba6fd06d7a6e5"
+checksum = "113b30b4cd05f7c06868fdb2854f66a7b9fece9a48425351cd532e810d74024f"
 
 [[package]]
 name = "longest-increasing-subsequence"
@@ -5741,6 +5749,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+ "valuable",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
 ]
 
 [[package]]
@@ -5918,6 +5938,12 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "valuable"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vcpkg"

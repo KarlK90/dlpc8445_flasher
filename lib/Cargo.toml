@@ -1,10 +1,11 @@
 [package]
 authors = ["Stefan Kerkmann"]
 name = "dlpc8445_proto"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.102"
 binrw = "0.15.1"
 bitfield-struct = "0.13.0"
 log = "0.4.29"
@@ -20,3 +21,4 @@ tokio = { version = "1.52.3", features = ["full"] }
 [target.'cfg(target_family = "wasm")'.dependencies]
 webusb-web = "0.5.1"
 gloo-timers = { version = "0.4.0", features = ["futures"] }
+tokio = { version = "1.52.3", features = ["sync", "macros"] }

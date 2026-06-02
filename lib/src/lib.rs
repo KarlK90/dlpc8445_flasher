@@ -5,6 +5,8 @@ pub mod dlpc8445;
 pub mod flash;
 pub mod protocol;
 
+pub mod runner;
+
 #[cfg(not(target_family = "wasm"))]
 pub mod native;
 #[cfg(target_family = "wasm")]

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use dioxus::prelude::*;
 use dioxus_icons::lucide::TriangleAlert;
 
@@ -7,10 +10,11 @@ use crate::components::alert_dialog::{
 };
 
 #[component]
-pub fn ModeSwitchAlertDialog() -> Element {
+pub fn ModeSwitchAlertDialog(open: Signal<bool>, on_confirm: EventHandler<MouseEvent>) -> Element {
     rsx! {
         AlertDialog {
-            open: false,
+            open: open(),
+            on_open_change: move |v| open.set(v),
             AlertDialogTitle {
                 div {
                     class: "inline-flex items-center",
@@ -18,14 +22,15 @@ pub fn ModeSwitchAlertDialog() -> Element {
                         class: "mr-2",
                         TriangleAlert {}
                     }
-                    "Enter Flash Mode?"
+                    "Enter Flash Mode"
                 }
             }
             AlertDialogDescription {
                 p {
-                    "Switching the DLPC 8445 from application mode to bootrom invalidates the image currently on flash."
+                    "Switching the DLPC 8445 from application mode to Boot ROM invalidates the image currently on flash."
                 }
                 p {
+                    class: "font-medium",
                     "You must flash a valid firmware image after entering flash mode, or the device will not boot."
                 }
                 p {
@@ -34,7 +39,7 @@ pub fn ModeSwitchAlertDialog() -> Element {
             }
             AlertDialogActions {
                 AlertDialogCancel { "Cancel" }
-                AlertDialogAction { "Yes, enter flash mode" }
+                AlertDialogAction { on_click: on_confirm, "Yes, enter flash mode" }
             }
         }
     }

@@ -6,3 +6,10 @@ rustflags = [
     "--cfg",
     "web_sys_unstable_apis",
 ]
+
+[profile.release]
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+incremental = false

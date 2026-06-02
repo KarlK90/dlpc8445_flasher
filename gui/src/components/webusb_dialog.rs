@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
+
 use dioxus::prelude::*;
 use dioxus_icons::lucide::OctagonX;
 
@@ -15,16 +18,18 @@ pub fn WebUsbSupportDialog() -> Element {
                         class: "mr-2",
                         OctagonX { }
                     }
-                    "WebUSB not supported"
+                    "Your browser does not support WebUSB"
                 }
             }
             DialogDescription {
-                p { "This browser does not support WebUSB. See "
+                p { "See "
                     a {
+                        class: "font-medium text-blue-500 hover:underline",
                         href:"https://caniuse.com/webusb",
-                        "Can I use: WebUSB"
+                        target: "_blank",
+                        "Can I use WebUSB?"
                     }
-                    " for a list of browsers supporting WebUSB."
+                    " for a list of supported browsers."
                 }
             }
         }
