@@ -104,11 +104,11 @@ jobs:
 
       - name: Build with cross
         if: matrix.platform.use_cross
-        run: cross build --release --target ${{ matrix.platform.target }}
+        run: cross build --release --bin dlpc8445_flasher --target ${{ matrix.platform.target }}
 
       - name: Build natively
         if: ${{ !matrix.platform.use_cross }}
-        run: cargo build --release --target ${{ matrix.platform.target }}
+        run: cargo build --release --bin dlpc8445_flasher --target ${{ matrix.platform.target }}
 
       - name: Get binary name
         id: binary_name
