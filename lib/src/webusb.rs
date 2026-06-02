@@ -95,7 +95,9 @@ impl SendCommand for WebUsbConnection {
 impl From<webusb_web::Error> for Dlpc8445Error {
     fn from(err: webusb_web::Error) -> Self {
         match err.kind() {
-            webusb_web::ErrorKind::Disconnected => Dlpc8445Error::UsbDisconnected,
+            webusb_web::ErrorKind::Disconnected | webusb_web::ErrorKind::Transfer => {
+                Dlpc8445Error::UsbDisconnected
+            }
             _ => Dlpc8445Error::general(err.to_string()),
         }
     }
