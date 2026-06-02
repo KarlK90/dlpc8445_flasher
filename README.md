@@ -27,8 +27,8 @@ Install Rust and Cargo (e.g. via [rustup](https://rustup.rs/)), then clone the r
 git clone <repository-url>
 cd dlpc8445_flasher
 
-# Build the binary
-cargo build --release
+# Build the cli binary
+cargo build --release --bin dlpc8445_flasher
 
 # The binary will be available at:
 # target/release/dlpc8445_flasher
