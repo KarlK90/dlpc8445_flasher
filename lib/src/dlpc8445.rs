@@ -323,7 +323,7 @@ impl<T: SendCommand> Dlpc8445Con<T> {
             .await
     }
 
-    pub async fn verify_flash_mode(&mut self, enter_flash_mode: bool) -> Result<()> {
+    pub async fn verify_flash_mode(mut self, enter_flash_mode: bool) -> Result<Self> {
         let current_mode = self
             .inner
             .send_command(ReadModeCommand)
@@ -339,32 +339,17 @@ impl<T: SendCommand> Dlpc8445Con<T> {
                     "Switching to flash mode... (current mode: {})",
                     current_mode
                 );
+                // DLPC will disconnect at this point
                 self.inner
                     .send_command(WriteSwitchApplicationCommand::new(
                         SwitchApplicationOption::BootApplication,
                     ))
                     .await?;
 
-                // Give device time to switch modes
+                // Give some time to settle and force the upper layer to
+                // re-establish the USB connection
                 sleep(Duration::from_secs(2)).await;
-
-                let current_mode = self
-                    .inner
-                    .send_command(ReadModeCommand)
-                    .await?
-                    .application_mode();
-
-                if !matches!(
-                    current_mode,
-                    ApplicationMode::BootRom | ApplicationMode::SecondaryBootApplication
-                ) {
-                    return Err(Dlpc8445Error::general(format!(
-                        "Failed to switch to flash mode after mode switch command (current mode: {})",
-                        current_mode
-                    )));
-                }
-
-                info!("Successfully switched to flash mode ({})", current_mode);
+                return Err(Dlpc8445Error::UsbDisconnected);
             } else {
                 return Err(Dlpc8445Error::general(format!(
                     "Device is not in flash mode (current mode: {}). Use --enter-flash-mode to switch.",
@@ -375,7 +360,7 @@ impl<T: SendCommand> Dlpc8445Con<T> {
             info!("Device is in flash mode (current mode: {})", current_mode);
         }
 
-        Ok(())
+        Ok(self)
     }
 
     pub async fn erase_session(&mut self, flash_state: &mut FlashState) -> Result<String> {

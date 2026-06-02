@@ -36,12 +36,12 @@ async fn main() -> anyhow::Result<()> {
     info!("Waiting for device...");
 
     loop {
-        let mut dlpc = {
+        let dlpc = {
             use dlpc8445_proto::native::NativeConnection;
             Dlpc8445Con::<NativeConnection>::wait_for_device().await?
         };
 
-        match native::run_session(&mut dlpc, &mut flash_state, &args).await {
+        match native::run_session(dlpc, &mut flash_state, &args).await {
             Err(Dlpc8445Error::UsbDisconnected) => {
                 warn!("DLPC8445 disconnected");
                 flash_state.reset_current_sector();
@@ -119,11 +119,11 @@ mod native {
     }
 
     pub async fn run_session<T: SendCommand>(
-        dlpc: &mut Dlpc8445Con<T>,
+        dlpc: Dlpc8445Con<T>,
         flash_state: &mut FlashState,
         args: &Ops,
     ) -> std::result::Result<String, Dlpc8445Error> {
-        dlpc.verify_flash_mode(args.enter_flash_mode).await?;
+        let mut dlpc = dlpc.verify_flash_mode(args.enter_flash_mode).await?;
 
         let dlpc_info = dlpc.query_info().await?;
         if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
