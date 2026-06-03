@@ -25,6 +25,10 @@ pub async fn wait_for_device() -> Result<WebUsbConnection> {
 
     let device = 'outer: loop {
         for device in usb.devices().await.into_iter() {
+            if device.opened() {
+                dbg!("Device already opened, skipping");
+                continue;
+            }
             match device.open().await {
                 Ok(device) => {
                     debug!("Device found");
@@ -50,9 +54,13 @@ pub async fn wait_for_device() -> Result<WebUsbConnection> {
 pub async fn query_for_device() -> Option<WebUsbConnection> {
     let usb = Usb::new().ok()?;
 
-    let mut devices = usb.devices().await;
+    let devices = usb.devices().await;
 
     for device in devices.into_iter() {
+        if device.opened() {
+            dbg!("Device already opened, skipping");
+            continue;
+        }
         match device.open().await {
             Ok(device) => {
                 debug!("Device found");
