@@ -161,3 +161,31 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: stable
+          profile: minimal
+          target: wasm32-unknown-unknown
+          override: true
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Dioxus-CLI
+        shell: bash
+        run: curl -sSL https://dioxus.dev/install.sh | bash
+
+      - name: Build Project 🎁
+        shell: bash
+        run: cd gui && dx bundle --release --base-path="dlpc8445_flasher"
+
+      - name: Deploy Project 🚀
+        uses: JamesIves/github-pages-deploy-action@v4.4.1
+        with:
+          branch: gh-pages
+          folder: target/dx/dlpc8445_flasher_gui/release/web/public
+          clean: false
