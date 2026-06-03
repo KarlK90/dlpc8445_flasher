@@ -240,7 +240,10 @@ impl<T: ConnectionBackend> Runner<T> {
                                     Ok(dlpc) => dlpc,
                                     Err(err) => {
                                         error!("Error while waiting for device: {err}");
-                                        return Err(err.into());
+                                        self.send_event(RunnerEvent::RunnerStateUpdate(
+                                            RunnerState::Error,
+                                        ))?;
+                                        break;
                                     }
                                 };
 
@@ -256,12 +259,12 @@ impl<T: ConnectionBackend> Runner<T> {
                                 self.send_event(RunnerEvent::RunnerStateUpdate(
                                     RunnerState::Error,
                                 ))?;
-                                return Err(err.into());
+                                break;
                             }
                             Ok(msg) => {
                                 info!("{msg}");
                                 self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Done))?;
-                                return Ok(());
+                                break;
                             }
                         }
                     }
