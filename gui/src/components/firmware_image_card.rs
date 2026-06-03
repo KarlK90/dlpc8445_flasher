@@ -4,7 +4,10 @@
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use dioxus_icons::lucide::Folder;
-use dlpc8445_proto::{flash::FlashState, runner::RunnerCommand};
+use dlpc8445_proto::{
+    flash::FlashState,
+    runner::{RunnerCommand, RunnerState},
+};
 use tracing_log::log;
 
 use crate::{
@@ -28,6 +31,7 @@ async fn create_flash_state(event: Event<FormData>) -> anyhow::Result<FlashState
 #[component]
 pub fn FirmwareImageCard() -> Element {
     let state = use_context::<Dlpc8445GuiState>();
+    let runner_state = state.runner_state.read().clone();
 
     rsx! {
             Card {
@@ -44,7 +48,7 @@ pub fn FirmwareImageCard() -> Element {
                                 id: "firmware-upload-input",
                                 class: "text-center text-sm text-gray-500",
                                 r#type: "file",
-                                disabled: false,
+                                disabled: runner_state == RunnerState::Running,
                                 accept: ".img,application/octet-stream",
                                 onchange: move |event| {
                                     spawn(async move {
@@ -64,6 +68,7 @@ pub fn FirmwareImageCard() -> Element {
                 CardFooter {
                     CardAction {
                     Button {
+                        disabled: matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect),
                         variant: ButtonVariant::Outline,
                         onclick: move |_| {
                             let _ = eval(r#"

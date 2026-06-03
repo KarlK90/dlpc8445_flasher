@@ -3,7 +3,7 @@
 
 use dioxus::prelude::*;
 use dioxus_icons::lucide::{Circle, Usb};
-use dlpc8445_proto::runner::{DeviceState, RunnerCommand};
+use dlpc8445_proto::runner::{DeviceState, RunnerCommand, RunnerState};
 
 use crate::{
     Dlpc8445GuiState,
@@ -22,6 +22,7 @@ pub fn ConnectionStatusCard() -> Element {
     } else {
         "lightgreen"
     };
+    let runner_state = state.runner_state.read().clone();
 
     rsx! {
         Card {
@@ -43,6 +44,7 @@ pub fn ConnectionStatusCard() -> Element {
             CardFooter {
                 CardAction {
                     Button {
+                        disabled: matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect),
                         onclick: move |_| {
                             spawn(
                                 async move {

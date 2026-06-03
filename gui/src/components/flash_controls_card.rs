@@ -43,7 +43,7 @@ pub fn FlashControlCard() -> Element {
             CardFooter {
                 CardAction {
                     Button {
-                        disabled: (*state.device_state.read() == DeviceState::Disconnected) || (matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect)),
+                        disabled: (*state.device_state.read() == DeviceState::Disconnected) || matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect) || progress.total == 0,
                         onclick: move |_| {
                             let device_state = *state.device_state.read();
                             if device_state == DeviceState::ConnectedApplication {
