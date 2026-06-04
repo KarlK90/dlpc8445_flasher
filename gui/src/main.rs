@@ -68,13 +68,9 @@ fn App() -> Element {
     });
 
     spawn(async move {
-        let mut runner = Runner::<WebUsbConnection>::new(event_tx, command_rx);
-        loop {
-            match runner.run().await {
-                Ok(_) => info!("Runner finished successfully"),
-                Err(err) => error!("Runner encountered an error: {err}"),
-            }
-        }
+        Runner::<WebUsbConnection>::new(event_tx, command_rx)
+            .run()
+            .await;
     });
 
     spawn(async move {

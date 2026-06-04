@@ -167,12 +167,12 @@ impl<T: ConnectionBackend> Runner<T> {
         }
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self) {
         loop {
             let command = tokio::select! {
                 cmd = self.command_rx.recv() => {
                     let Some(cmd) = cmd else {
-                        return Ok(()); // Channel closed
+                        return; // Channel closed
                     };
                     Some(cmd)
                 }
