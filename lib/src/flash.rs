@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use log::{info, warn};
+use log::{error, info, warn};
 
 use crate::{Dlpc8445Error, Result, fletcher_64};
 
@@ -38,12 +38,17 @@ impl FlashState {
         self.current_sector
     }
 
-    pub fn current_sector(&mut self) -> &mut FlashSector {
-        &mut self.sectors[self.current_sector]
+    pub fn current_sector(&mut self) -> Option<&mut FlashSector> {
+        if self.is_done() {
+            return None;
+        }
+        self.sectors.get_mut(self.current_sector)
     }
 
     pub fn reset_current_sector(&mut self) {
-        let sector = self.current_sector();
+        let Some(sector) = self.current_sector() else {
+            return;
+        };
         warn!(
             "Interrupted on sector {}; restarting from 0x{:08X}",
             sector.idx, sector.start_addr

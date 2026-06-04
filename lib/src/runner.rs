@@ -315,14 +315,12 @@ impl<T: ConnectionBackend> Runner<T> {
         }
 
         info!(
-            "boot_hold_reason={} flash_id={{manufacturer: 0x{:02X}, device: 0x{:02X}, capacity: 0x{:04X}}} sector_size={} current_sector={current}/{total}",
+            "boot_hold_reason={} flash_id={{manufacturer: 0x{:02X}, device: 0x{:02X}, capacity: 0x{:04X}}} sector_size={}",
             dlpc_info.boot_hold_reason.reason,
             dlpc_info.flash_id.manufacturer,
             dlpc_info.flash_id.device,
             dlpc_info.flash_id.capacity,
             dlpc_info.flash_sector.sector_size,
-            total = flash_state.sectors().len(),
-            current = flash_state.current_sector().idx,
         );
 
         match action {
@@ -350,15 +348,11 @@ impl<T: ConnectionBackend> Runner<T> {
         }
 
         let total_sectors = flash_state.sectors().len();
-
-        while !flash_state.is_done() {
+        while let Some(sector) = flash_state.current_sector() {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-                current: flash_state.current_sector_index(),
+                current: 0 + (total_sectors - sector.idx), // Flash progress is reversed
                 total: total_sectors,
             }));
-
-            let sector = flash_state.current_sector();
-
             if sector.checksum_unreliable {
                 info!(
                     "Sector {} at 0x{:08X} checksum unreliable; force erasing and programming",
@@ -424,11 +418,6 @@ impl<T: ConnectionBackend> Runner<T> {
             flash_state.advance_sector();
         }
 
-        self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-            current: total_sectors,
-            total: total_sectors,
-        }));
-
         dlpc.lock_flash().await?;
         Ok("Flash programming complete!".to_string())
     }
@@ -439,26 +428,17 @@ impl<T: ConnectionBackend> Runner<T> {
         flash_state: &mut FlashState,
     ) -> Result<String> {
         let total_sectors = flash_state.sectors().len();
-
-        while !flash_state.is_done() {
+        while let Some(sector) = flash_state.current_sector() {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-                current: flash_state.current_sector_index(),
+                current: sector.idx,
                 total: total_sectors,
             }));
-
-            let sector = flash_state.current_sector();
-
             match dlpc.validate_sector(sector).await {
                 Ok(_) => info!("Sector {}: valid", sector.idx),
                 Err(err) => error!("Sector {}: invalid {err}", sector.idx),
             }
             flash_state.advance_sector();
         }
-
-        self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-            current: total_sectors,
-            total: total_sectors,
-        }));
 
         let (total, valid, invalid) = flash_state.validation_result();
 
@@ -481,14 +461,11 @@ impl<T: ConnectionBackend> Runner<T> {
         dlpc.unlock_flash().await?;
 
         let total_sectors = flash_state.sectors().len();
-
-        while !flash_state.is_done() {
+        while let Some(sector) = flash_state.current_sector() {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-                current: flash_state.current_sector_index(),
+                current: sector.idx,
                 total: total_sectors,
             }));
-
-            let sector = flash_state.current_sector();
             info!(
                 "Erasing sector {} at 0x{:08X}",
                 sector.idx, sector.start_addr
@@ -497,11 +474,6 @@ impl<T: ConnectionBackend> Runner<T> {
             info!("Done erasing sector {}", sector.idx);
             flash_state.advance_sector();
         }
-
-        self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-            current: total_sectors,
-            total: total_sectors,
-        }));
 
         Ok("All sectors erased successfully".to_string())
     }
