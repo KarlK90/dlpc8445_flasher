@@ -18,9 +18,6 @@ use crate::{
     sleep,
 };
 
-#[cfg(target_family = "wasm")]
-use crate::webusb::WebUsbConnection;
-
 const MAX_SECTOR_REPROGRAM_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Clone)]
