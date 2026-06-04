@@ -12,7 +12,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{
     Dlpc8445Error, Result,
-    dlpc8445::{ConnectionBackend, Dlpc8445Con, SendCommand},
+    dlpc8445::{ConnectionBackend, Dlpc8445Con},
     flash::{FLASH_SECTOR_SIZE, FlashState},
     protocol::ApplicationMode,
     sleep,
@@ -224,9 +224,23 @@ impl<T: ConnectionBackend> Runner<T> {
                             .run_session(action, &mut dlpc, flash_state, enter_flash_mode)
                             .await
                         {
-                            Err(Dlpc8445Error::UsbDisconnected) => {
-                                warn!("DLPC 8445 disconnected");
-                                flash_state.reset_current_sector();
+                            Err(err) => {
+                                if matches!(err, Dlpc8445Error::UsbDisconnected) {
+                                    warn!("DLPC 8445: disconnected");
+                                    self.send_event(RunnerEvent::DeviceStateUpdate(
+                                        DeviceState::Disconnected,
+                                    ))?;
+                                } else {
+                                    error!("DLPC 8445: {}", err);
+                                    warn!("Resetting USB connecting");
+                                    self.send_event(RunnerEvent::RunnerStateUpdate(
+                                        RunnerState::Error,
+                                    ))?;
+                                    match dlpc.reset().await {
+                                        Ok(_) => info!("USB connection reset successfully"),
+                                        Err(err) => error!("Failed to reset USB connection: {err}"),
+                                    }
+                                }
 
                                 self.send_event(RunnerEvent::DeviceStateUpdate(
                                     DeviceState::Disconnected,
@@ -234,8 +248,10 @@ impl<T: ConnectionBackend> Runner<T> {
                                 self.send_event(RunnerEvent::RunnerStateUpdate(
                                     RunnerState::WaitingForReconnect,
                                 ))?;
-
                                 info!("Waiting for device to reconnect...");
+
+                                flash_state.reset_current_sector();
+
                                 dlpc = match T::wait_for_device().await {
                                     Ok(dlpc) => dlpc,
                                     Err(err) => {
@@ -246,20 +262,12 @@ impl<T: ConnectionBackend> Runner<T> {
                                         break;
                                     }
                                 };
-
                                 self.send_event(RunnerEvent::DeviceStateUpdate(
                                     DeviceState::Connected,
                                 ))?;
                                 self.send_event(RunnerEvent::RunnerStateUpdate(
                                     RunnerState::Running,
                                 ))?;
-                            }
-                            Err(err) => {
-                                error!("{}", err);
-                                self.send_event(RunnerEvent::RunnerStateUpdate(
-                                    RunnerState::Error,
-                                ))?;
-                                break;
                             }
                             Ok(msg) => {
                                 info!("{msg}");
