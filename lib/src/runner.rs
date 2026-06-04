@@ -238,6 +238,7 @@ impl<T: ConnectionBackend> Runner<T> {
                                         self.send_event(RunnerEvent::RunnerStateUpdate(
                                             RunnerState::Error,
                                         ));
+                                        self.dlpc.replace(Some(dlpc));
                                         break;
                                     }
                                     _ => {
@@ -264,6 +265,8 @@ impl<T: ConnectionBackend> Runner<T> {
                                 info!("Waiting for device to reconnect...");
 
                                 flash_state.reset_current_sector();
+                                // Explicitly drop the connection before waiting to ensure OS frees the interface
+                                drop(dlpc);
 
                                 dlpc = match T::wait_for_device().await {
                                     Ok(dlpc) => dlpc,
@@ -285,6 +288,7 @@ impl<T: ConnectionBackend> Runner<T> {
                             Ok(msg) => {
                                 info!("{msg}");
                                 self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Done));
+                                self.dlpc.replace(Some(dlpc));
                                 break;
                             }
                         }
