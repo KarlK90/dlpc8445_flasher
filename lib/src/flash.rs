@@ -85,15 +85,22 @@ impl FlashState {
         let sectors = image
             .chunks(FLASH_SECTOR_SIZE)
             .enumerate()
-            .map(|(idx, data)| FlashSector {
-                idx,
-                current_addr: 0,
-                start_addr: idx * FLASH_SECTOR_SIZE,
-                end_addr: idx * FLASH_SECTOR_SIZE + data.len(),
-                verified: false,
-                erased: false,
-                data: data.to_vec(),
-                checksum: fletcher_64(data),
+            .map(|(idx, data)| {
+                let checksum = fletcher_64(data);
+                let all_zeros = data.iter().all(|&b| b == 0);
+                let all_ones = data.iter().all(|&b| b == 0xFF);
+
+                FlashSector {
+                    idx,
+                    current_addr: 0,
+                    start_addr: idx * FLASH_SECTOR_SIZE,
+                    end_addr: idx * FLASH_SECTOR_SIZE + data.len(),
+                    verified: false,
+                    erased: false,
+                    data: data.to_vec(),
+                    checksum,
+                    checksum_unreliable: all_zeros || all_ones,
+                }
             })
             .collect::<Vec<_>>();
 
@@ -159,6 +166,7 @@ pub struct FlashSector {
     pub erased: bool,
     pub data: Vec<u8>,
     pub checksum: u64,
+    pub checksum_unreliable: bool,
 }
 
 impl FlashSector {

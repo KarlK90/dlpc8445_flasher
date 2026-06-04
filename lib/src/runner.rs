@@ -360,7 +360,12 @@ impl<T: ConnectionBackend> Runner<T> {
 
             let sector = flash_state.current_sector();
 
-            if dlpc.validate_sector(sector).await.is_ok() {
+            if sector.checksum_unreliable {
+                info!(
+                    "Sector {} at 0x{:08X} checksum unreliable; force erasing and programming",
+                    sector.idx, sector.start_addr
+                );
+            } else if dlpc.validate_sector(sector).await.is_ok() {
                 info!(
                     "Sector {} at 0x{:08X} already matches image",
                     sector.idx, sector.start_addr
@@ -368,12 +373,12 @@ impl<T: ConnectionBackend> Runner<T> {
 
                 flash_state.advance_sector();
                 continue;
+            } else {
+                info!(
+                    "Sector {} checksum mismatch; erasing and programming",
+                    sector.idx,
+                );
             }
-
-            info!(
-                "Sector {} checksum mismatch; erasing and programming",
-                sector.idx,
-            );
 
             let mut reprogram_attempts = 0usize;
 
