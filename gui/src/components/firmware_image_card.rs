@@ -4,11 +4,12 @@
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use dioxus_icons::lucide::Folder;
+use log::error;
+
 use dlpc8445_proto::{
     flash::FlashState,
-    runner::{RunnerCommand, RunnerState},
+    runner::{ActionProgress, RunnerCommand, RunnerState},
 };
-use tracing_log::log;
 
 use crate::{
     components::{
@@ -21,7 +22,10 @@ use crate::{
 
 async fn create_flash_state(event: Event<FormData>) -> anyhow::Result<FlashState> {
     if let Some(file) = event.files().pop() {
-        let bytes = file.read_bytes().await.map_err(|e| anyhow::anyhow!("Failed to read file bytes: {:?}", e))?;
+        let bytes = file
+            .read_bytes()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to read file bytes: {:?}", e))?;
         return Ok(FlashState::from_buffer(bytes)?);
     }
     return Err(anyhow::anyhow!("No file selected"));
@@ -29,7 +33,7 @@ async fn create_flash_state(event: Event<FormData>) -> anyhow::Result<FlashState
 
 #[component]
 pub fn FirmwareImageCard() -> Element {
-    let state = use_context::<Dlpc8445GuiState>();
+    let mut state = use_context::<Dlpc8445GuiState>();
     let runner_state = state.runner_state.read().clone();
 
     rsx! {
@@ -55,7 +59,10 @@ pub fn FirmwareImageCard() -> Element {
                                                 Ok(flash_state) => {
                                                     state.send_command(RunnerCommand::LoadImage {image: flash_state}).await;
                                                 },
-                                                Err(err) => log::error!("Failed to create flash state: {}", err),
+                                                Err(err) => {
+                                                    error!("Failed to create flash state: {}", err);
+                                                    *state.action_progress.write() = ActionProgress::default();
+                                                },
                                             };
                                         }
                                     );

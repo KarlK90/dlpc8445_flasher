@@ -111,7 +111,7 @@ pub enum RunnerEvent {
     RunnerStateUpdate(RunnerState),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ActionProgress {
     pub current: usize,
     pub total: usize,
