@@ -1,6 +1,6 @@
 [package]
 name = "dlpc8445_flasher_gui"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Stefan Kerkmann <karlk90@pm.me>"]
 edition = "2024"
 
