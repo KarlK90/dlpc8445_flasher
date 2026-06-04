@@ -11,7 +11,9 @@ use crate::sleep;
 
 use crate::{
     Dlpc8445Error, Result,
-    dlpc8445::{BULK_MAX_PACKET_SIZE, PRODUCT_ID, SendCommand, VENDOR_ID},
+    dlpc8445::{
+        BULK_MAX_PACKET_SIZE, ConnectionBackend, Dlpc8445Con, PRODUCT_ID, SendCommand, VENDOR_ID,
+    },
     protocol::{Command, ResponsePacket, ResponsePayload},
 };
 
@@ -95,6 +97,13 @@ pub async fn request_device_access() -> Result<WebUsbConnection> {
     })
 }
 
+impl WebUsbConnection {
+    pub async fn reset(&mut self) -> Result<()> {
+        self.device.reset().await?;
+        Ok(())
+    }
+}
+
 impl SendCommand for WebUsbConnection {
     async fn send_command<T, R>(&mut self, command: T) -> Result<R>
     where
@@ -139,5 +148,23 @@ impl From<webusb_web::Error> for Dlpc8445Error {
             | webusb_web::ErrorKind::Stall => Dlpc8445Error::UsbDisconnected,
             _ => Dlpc8445Error::general(err.to_string()),
         }
+    }
+}
+
+impl ConnectionBackend for WebUsbConnection {
+    async fn request_device_access() -> Result<Dlpc8445Con<Self>> {
+        Ok(Dlpc8445Con::new(request_device_access().await?))
+    }
+
+    async fn wait_for_device() -> Result<Dlpc8445Con<Self>> {
+        Ok(Dlpc8445Con::new(wait_for_device().await?))
+    }
+
+    async fn query_for_device() -> Option<Dlpc8445Con<Self>> {
+        Some(Dlpc8445Con::new(query_for_device().await?))
+    }
+
+    async fn reset(&mut self) -> Result<()> {
+        Ok(self.device.reset().await?)
     }
 }

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use log::{info, warn};
 
-use crate::{Checksum, Dlpc8445Error, Result, fletcher_64};
+use crate::{Dlpc8445Error, Result, fletcher_64};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlashState {
