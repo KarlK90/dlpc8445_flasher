@@ -215,8 +215,6 @@ impl<T: ConnectionBackend> Runner<T> {
 
                     flash_state.reset();
 
-                    self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Running));
-
                     loop {
                         match self
                             .run_session(action, &mut dlpc, flash_state, enter_flash_mode)
@@ -302,6 +300,7 @@ impl<T: ConnectionBackend> Runner<T> {
         flash_state: &mut FlashState,
         enter_flash_mode: bool,
     ) -> std::result::Result<String, Dlpc8445Error> {
+        self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Running));
         dlpc.verify_flash_mode(enter_flash_mode).await?;
 
         let dlpc_info = dlpc.query_info().await?;
