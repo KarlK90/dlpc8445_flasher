@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     // Drop the sender so the command channel closes eventually (if the runner loops again after StartAction)
     drop(command_tx);
 
-    runner.run().await?;
+    runner.run().await;
 
     Ok(())
 }
