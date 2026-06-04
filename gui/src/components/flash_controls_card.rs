@@ -2,8 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
 
 use dioxus::prelude::*;
-use dioxus_icons::lucide::Sparkles;
-use dlpc8445_proto::runner::{DeviceState, RunnerAction, RunnerCommand, RunnerState};
+use dioxus_icons::lucide::{CircleCheck, Sparkles};
+use dlpc8445_proto::{
+    protocol::SwitchApplicationOption,
+    runner::{DeviceState, RunnerAction, RunnerCommand, RunnerState},
+};
 
 use crate::{
     components::{
@@ -59,6 +62,20 @@ pub fn FlashControlCard() -> Element {
                         variant: ButtonVariant::Outline,
                         Sparkles { size: 20, stroke: "black" }
                         "Start Flash"
+                    }
+                    Button {
+                        disabled: (*state.device_state.read() != DeviceState::ConnectedFlashMode) || *state.runner_state.read() != RunnerState::Done,
+                        class: "ml-4",
+                        onclick: move |_| {
+                                spawn(
+                                    async move {
+                                        state.send_command(RunnerCommand::SwitchMode { mode: SwitchApplicationOption::MainApplication }).await;
+                                    }
+                                );
+                        },
+                        variant: ButtonVariant::Outline,
+                        CircleCheck{ size: 20, stroke: "black" }
+                        "Switch to Application Mode"
                     }
                 }
             }

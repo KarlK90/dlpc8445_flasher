@@ -34,6 +34,10 @@ pub fn HelpInformationCard() -> Element {
                         strong { "Monitor Progress" }
                         " - Watch the progress bar and log viewer for status, progress, and errors."
                     }
+                    li {
+                        strong { "Switch to Application Mode" }
+                        " - If the flash process is successful, switch back to the main application mode after flashing. Either by clicking \"Switch to Application Mode\" or power cycling the device."
+                    }
                 }
             }
         }
