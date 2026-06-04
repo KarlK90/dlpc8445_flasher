@@ -4,10 +4,8 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use dioxus::prelude::*;
-use dlpc8445_proto::{
-    runner::{ActionProgress, DeviceState, Runner, RunnerEvent, RunnerState},
-    webusb::WebUsbConnection,
-};
+use dlpc8445_proto::runner::{ActionProgress, DeviceState, Runner, RunnerEvent, RunnerState};
+
 use log;
 use tokio::sync::{
     Mutex,
@@ -68,7 +66,12 @@ fn App() -> Element {
     });
 
     spawn(async move {
-        Runner::<WebUsbConnection>::new(event_tx, command_rx)
+        #[cfg(target_family = "wasm")]
+        Runner::<dlpc8445_proto::webusb::WebUsbConnection>::new(event_tx, command_rx)
+            .run()
+            .await;
+        #[cfg(not(target_family = "wasm"))]
+        Runner::<dlpc8445_proto::native::NativeConnection>::new(event_tx, command_rx)
             .run()
             .await;
     });

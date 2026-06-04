@@ -10,7 +10,13 @@ use crate::components::dialog::{Dialog, DialogDescription, DialogTitle};
 pub fn WebUsbSupportDialog() -> Element {
     rsx! {
         Dialog {
-            open: webusb_web::Usb::new().is_err(),
+            open: {
+                #[cfg(target_family = "wasm")]
+                let unsupported = webusb_web::Usb::new().is_err();
+                #[cfg(not(target_family = "wasm"))]
+                let unsupported = false;
+                unsupported
+            },
             DialogTitle {
                 div {
                     class: "inline-flex items-center",
