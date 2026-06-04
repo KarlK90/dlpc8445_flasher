@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use tokio::select;
 use webusb_web::{OpenUsbDevice, Usb, UsbDeviceFilter};
 
