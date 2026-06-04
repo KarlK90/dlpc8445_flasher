@@ -255,7 +255,7 @@ impl<T: ConnectionBackend> Dlpc8445Con<T> {
                 sleep(Duration::from_secs(2)).await;
                 return Err(Dlpc8445Error::UsbDisconnected);
             } else {
-                return Err(Dlpc8445Error::general(format!(
+                return Err(Dlpc8445Error::RunnerAbort(format!(
                     "Device is not in flash mode (current mode: {}). Use --enter-flash-mode to switch.",
                     current_mode
                 )));
