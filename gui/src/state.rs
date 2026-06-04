@@ -20,9 +20,8 @@ pub(crate) struct Dlpc8445GuiState {
 
 impl Dlpc8445GuiState {
     pub(crate) async fn send_command(&self, command: RunnerCommand) {
-        self.command_tx
-            .read()
-            .send(command)
-            .expect("failed to send command");
+        if let Err(err) = self.command_tx.read().send(command) {
+            log::error!("Failed to send command to runner: {}", err);
+        }
     }
 }
