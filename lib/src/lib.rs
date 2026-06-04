@@ -26,6 +26,8 @@ pub enum Dlpc8445Error {
     Protocol(#[from] binrw::Error),
     #[error("{0}")]
     General(String),
+    #[error("{0}")]
+    RunnerAbort(String),
 }
 
 impl Dlpc8445Error {

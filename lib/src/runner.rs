@@ -226,20 +226,32 @@ impl<T: ConnectionBackend> Runner<T> {
                             .await
                         {
                             Err(err) => {
-                                if matches!(err, Dlpc8445Error::UsbDisconnected) {
-                                    warn!("DLPC 8445: disconnected");
-                                    self.send_event(RunnerEvent::DeviceStateUpdate(
-                                        DeviceState::Disconnected,
-                                    ));
-                                } else {
-                                    error!("DLPC 8445: {}", err);
-                                    warn!("Resetting USB connecting");
-                                    self.send_event(RunnerEvent::RunnerStateUpdate(
-                                        RunnerState::Error,
-                                    ));
-                                    match dlpc.reset().await {
-                                        Ok(_) => info!("USB connection reset successfully"),
-                                        Err(err) => error!("Failed to reset USB connection: {err}"),
+                                match err {
+                                    Dlpc8445Error::UsbDisconnected => {
+                                        warn!("DLPC 8445: disconnected");
+                                        self.send_event(RunnerEvent::DeviceStateUpdate(
+                                            DeviceState::Disconnected,
+                                        ));
+                                    }
+                                    Dlpc8445Error::RunnerAbort(err) => {
+                                        error!("{err}");
+                                        self.send_event(RunnerEvent::RunnerStateUpdate(
+                                            RunnerState::Error,
+                                        ));
+                                        break;
+                                    }
+                                    _ => {
+                                        error!("DLPC 8445: {}", err);
+                                        warn!("Resetting USB connecting");
+                                        self.send_event(RunnerEvent::RunnerStateUpdate(
+                                            RunnerState::Error,
+                                        ));
+                                        match dlpc.reset().await {
+                                            Ok(_) => info!("USB connection reset successfully"),
+                                            Err(err) => {
+                                                error!("Failed to reset USB connection: {err}")
+                                            }
+                                        }
                                     }
                                 }
 
@@ -296,7 +308,7 @@ impl<T: ConnectionBackend> Runner<T> {
         self.send_event(RunnerEvent::DeviceStateUpdate(dlpc_info.mode.into()));
 
         if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
-            return Err(Dlpc8445Error::general(format!(
+            return Err(Dlpc8445Error::RunnerAbort(format!(
                 "controller reported an invalid flash sector size of {} bytes, expected {}",
                 dlpc_info.flash_sector.sector_size, FLASH_SECTOR_SIZE
             )));
@@ -388,7 +400,7 @@ impl<T: ConnectionBackend> Runner<T> {
 
                 if let Err(err) = dlpc.validate_sector(sector).await {
                     if reprogram_attempts >= MAX_SECTOR_REPROGRAM_ATTEMPTS {
-                        return Err(Dlpc8445Error::general(format!(
+                        return Err(Dlpc8445Error::RunnerAbort(format!(
                             "Validation failed for sector {} after {} reprogram attempts: {}",
                             sector.idx, MAX_SECTOR_REPROGRAM_ATTEMPTS, err
                         )));
@@ -452,7 +464,7 @@ impl<T: ConnectionBackend> Runner<T> {
         if total == valid {
             Ok(msg)
         } else {
-            Err(Dlpc8445Error::general(msg))
+            Err(Dlpc8445Error::RunnerAbort(msg))
         }
     }
 
