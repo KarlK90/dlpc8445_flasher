@@ -244,10 +244,7 @@ impl<T: ConnectionBackend> Dlpc8445Con<T> {
                     current_mode
                 );
                 // DLPC will disconnect at this point
-                self.inner
-                    .send_command(WriteSwitchApplicationCommand::new(
-                        SwitchApplicationOption::BootApplication,
-                    ))
+                self.switch_mode(SwitchApplicationOption::BootApplication)
                     .await?;
 
                 // Give some time to settle and force the upper layer to
@@ -265,6 +262,12 @@ impl<T: ConnectionBackend> Dlpc8445Con<T> {
         }
 
         Ok(())
+    }
+
+    pub async fn switch_mode(&mut self, mode: SwitchApplicationOption) -> Result<()> {
+        self.inner
+            .send_command(WriteSwitchApplicationCommand::new(mode))
+            .await
     }
 
     pub async fn reset(&mut self) -> Result<()> {
