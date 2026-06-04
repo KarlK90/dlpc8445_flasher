@@ -22,7 +22,6 @@ pub fn ConnectionStatusCard() -> Element {
     } else {
         "lightgreen"
     };
-    let runner_state = state.runner_state.read().clone();
 
     rsx! {
         Card {
