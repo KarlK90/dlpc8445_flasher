@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use log::{error, info, warn};
+use log::info;
 
 use crate::{
     Dlpc8445Error, Result,
@@ -16,7 +16,7 @@ use crate::{
     sleep,
 };
 use crate::{
-    flash::{FLASH_PAGE_PROGRAM_TIME, FLASH_SECTOR_ERASE_TIME, FlashState},
+    flash::{FLASH_PAGE_PROGRAM_TIME, FLASH_SECTOR_ERASE_TIME},
     protocol::{
         ChecksumResponse, Command, FlashWriteCommand, ReadChecksumCommand,
         ReadUnlockFlashForUpdateCommand, ResponsePacket, ResponsePayload, WriteEraseSectorCommand,
@@ -48,51 +48,7 @@ pub trait ConnectionBackend: SendCommand + Sized {
     fn request_device_access() -> impl Future<Output = Result<Dlpc8445Con<Self>>>;
     fn wait_for_device() -> impl Future<Output = Result<Dlpc8445Con<Self>>>;
     fn query_for_device() -> impl Future<Output = Option<Dlpc8445Con<Self>>>;
-}
-
-#[cfg(not(target_family = "wasm"))]
-impl ConnectionBackend for crate::native::NativeConnection {
-    async fn request_device_access() -> Result<Dlpc8445Con<Self>> {
-        Self::wait_for_device().await // Native doesn't need explicit access request
-    }
-
-    async fn wait_for_device() -> Result<Dlpc8445Con<Self>> {
-        Ok(Dlpc8445Con {
-            inner: crate::native::wait_for_device().await?,
-            info: None,
-        })
-    }
-
-    async fn query_for_device() -> Option<Dlpc8445Con<Self>> {
-        Some(Dlpc8445Con {
-            inner: crate::native::query_for_device().await?,
-            info: None,
-        })
-    }
-}
-
-#[cfg(target_family = "wasm")]
-impl ConnectionBackend for crate::webusb::WebUsbConnection {
-    async fn request_device_access() -> Result<Dlpc8445Con<Self>> {
-        Ok(Dlpc8445Con {
-            inner: crate::webusb::request_device_access().await?,
-            info: None,
-        })
-    }
-
-    async fn wait_for_device() -> Result<Dlpc8445Con<Self>> {
-        Ok(Dlpc8445Con {
-            inner: crate::webusb::wait_for_device().await?,
-            info: None,
-        })
-    }
-
-    async fn query_for_device() -> Option<Dlpc8445Con<Self>> {
-        Some(Dlpc8445Con {
-            inner: crate::webusb::query_for_device().await?,
-            info: None,
-        })
-    }
+    fn reset(&mut self) -> impl Future<Output = Result<()>>;
 }
 
 #[derive(Debug)]
@@ -103,7 +59,11 @@ pub struct Dlpc8445Info {
     pub mode: ApplicationMode,
 }
 
-impl<T: SendCommand> Dlpc8445Con<T> {
+impl<T: ConnectionBackend> Dlpc8445Con<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner, info: None }
+    }
+
     pub async fn query_info(&mut self) -> Result<&Dlpc8445Info> {
         let boot_hold_reason = self.inner.send_command(ReadBootHoldReasonCommand).await?;
         let flash_info = self.inner.send_command(ReadFlashIdCommand).await?;
@@ -305,5 +265,9 @@ impl<T: SendCommand> Dlpc8445Con<T> {
         }
 
         Ok(())
+    }
+
+    pub async fn reset(&mut self) -> Result<()> {
+        self.inner.reset().await
     }
 }

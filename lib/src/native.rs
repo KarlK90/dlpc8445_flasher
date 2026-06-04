@@ -4,28 +4,28 @@
 use std::time::Duration;
 
 use log::{info, trace};
-use nusb::{ErrorKind, transfer::TransferError};
+use nusb::{Device, ErrorKind, transfer::TransferError};
 use nusb::{
     io::{EndpointRead, EndpointWrite},
     transfer::{Bulk, In, Out},
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::sleep;
-
 use crate::{
     Dlpc8445Error, Result,
     dlpc8445::{
-        BULK_IN_ENDPOINT, BULK_MAX_PACKET_SIZE, BULK_OUT_ENDPOINT, PRODUCT_ID, SendCommand,
-        VENDOR_ID,
+        BULK_IN_ENDPOINT, BULK_MAX_PACKET_SIZE, BULK_OUT_ENDPOINT, ConnectionBackend, Dlpc8445Con,
+        PRODUCT_ID, SendCommand, VENDOR_ID,
     },
     protocol::{Command, ResponsePacket, ResponsePayload},
+    sleep,
 };
 
 pub struct NativeConnection {
     writer: EndpointWrite<Bulk>,
     reader: EndpointRead<Bulk>,
     checksum_present: bool,
+    device: Device,
 }
 
 async fn query_device_impl(wait: bool) -> Result<NativeConnection> {
@@ -63,6 +63,7 @@ async fn query_device_impl(wait: bool) -> Result<NativeConnection> {
         writer,
         reader,
         checksum_present: false,
+        device,
     })
 }
 
@@ -72,6 +73,24 @@ pub async fn query_for_device() -> Option<NativeConnection> {
 
 pub async fn wait_for_device() -> Result<NativeConnection> {
     query_device_impl(true).await
+}
+
+impl ConnectionBackend for NativeConnection {
+    async fn request_device_access() -> Result<Dlpc8445Con<Self>> {
+        Self::wait_for_device().await // Native doesn't need explicit access request
+    }
+
+    async fn wait_for_device() -> Result<Dlpc8445Con<Self>> {
+        Ok(Dlpc8445Con::new(wait_for_device().await?))
+    }
+
+    async fn query_for_device() -> Option<Dlpc8445Con<Self>> {
+        Some(Dlpc8445Con::new(query_for_device().await?))
+    }
+
+    async fn reset(&mut self) -> Result<()> {
+        Ok(self.device.reset().await?)
+    }
 }
 
 impl SendCommand for NativeConnection {
