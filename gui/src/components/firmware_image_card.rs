@@ -21,8 +21,7 @@ use crate::{
 
 async fn create_flash_state(event: Event<FormData>) -> anyhow::Result<FlashState> {
     if let Some(file) = event.files().pop() {
-        // FIXME!
-        let bytes = file.read_bytes().await.unwrap();
+        let bytes = file.read_bytes().await.map_err(|e| anyhow::anyhow!("Failed to read file bytes: {:?}", e))?;
         return Ok(FlashState::from_buffer(bytes)?);
     }
     return Err(anyhow::anyhow!("No file selected"));
