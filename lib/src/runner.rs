@@ -128,10 +128,11 @@ pub struct Runner<T: ConnectionBackend> {
 }
 
 impl<T: ConnectionBackend> Runner<T> {
-    pub fn send_event(&self, event: RunnerEvent) -> Result<()> {
-        self.event_tx
-            .send(event)
-            .map_err(|e| Dlpc8445Error::general(e.to_string()))
+    pub fn send_event(&self, event: RunnerEvent) {
+        if self.event_tx.is_closed() {
+            warn!("event channel is closed; cannot send event");
+        }
+        _ = self.event_tx.send(event);
     }
 
     pub fn new(
@@ -151,17 +152,17 @@ impl<T: ConnectionBackend> Runner<T> {
 
         if let Some(dlpc) = self.dlpc.borrow_mut().as_mut() {
             if let Ok(mode) = dlpc.read_mode().await {
-                let _ = self.send_event(RunnerEvent::DeviceStateUpdate(mode.into()));
+                self.send_event(RunnerEvent::DeviceStateUpdate(mode.into()));
                 lost_connection = false;
             }
         }
 
         if lost_connection {
             self.dlpc.replace(None);
-            let _ = self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Disconnected));
+            self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Disconnected));
             if let Some(dlpc) = T::query_for_device().await {
                 self.dlpc.replace(Some(dlpc));
-                let _ = self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Connected));
+                self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Connected));
             }
         }
     }
@@ -189,7 +190,7 @@ impl<T: ConnectionBackend> Runner<T> {
                 RunnerCommand::RequestDeviceAccess => match T::request_device_access().await {
                     Ok(dlpc) => {
                         self.dlpc.replace(Some(dlpc));
-                        self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Connected))?;
+                        self.send_event(RunnerEvent::DeviceStateUpdate(DeviceState::Connected));
                     }
                     Err(err) => {
                         error!("Failed to request device access: {err}");
@@ -199,7 +200,7 @@ impl<T: ConnectionBackend> Runner<T> {
                     self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
                         current: 0,
                         total: image.sectors().len(),
-                    }))?;
+                    }));
                     *self.flash_state.borrow_mut() = Some(image);
                 }
                 RunnerCommand::StartAction {
@@ -217,7 +218,7 @@ impl<T: ConnectionBackend> Runner<T> {
 
                     flash_state.reset();
 
-                    self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Running))?;
+                    self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Running));
 
                     loop {
                         match self
@@ -229,13 +230,13 @@ impl<T: ConnectionBackend> Runner<T> {
                                     warn!("DLPC 8445: disconnected");
                                     self.send_event(RunnerEvent::DeviceStateUpdate(
                                         DeviceState::Disconnected,
-                                    ))?;
+                                    ));
                                 } else {
                                     error!("DLPC 8445: {}", err);
                                     warn!("Resetting USB connecting");
                                     self.send_event(RunnerEvent::RunnerStateUpdate(
                                         RunnerState::Error,
-                                    ))?;
+                                    ));
                                     match dlpc.reset().await {
                                         Ok(_) => info!("USB connection reset successfully"),
                                         Err(err) => error!("Failed to reset USB connection: {err}"),
@@ -244,10 +245,10 @@ impl<T: ConnectionBackend> Runner<T> {
 
                                 self.send_event(RunnerEvent::DeviceStateUpdate(
                                     DeviceState::Disconnected,
-                                ))?;
+                                ));
                                 self.send_event(RunnerEvent::RunnerStateUpdate(
                                     RunnerState::WaitingForReconnect,
-                                ))?;
+                                ));
                                 info!("Waiting for device to reconnect...");
 
                                 flash_state.reset_current_sector();
@@ -258,20 +259,20 @@ impl<T: ConnectionBackend> Runner<T> {
                                         error!("Error while waiting for device: {err}");
                                         self.send_event(RunnerEvent::RunnerStateUpdate(
                                             RunnerState::Error,
-                                        ))?;
+                                        ));
                                         break;
                                     }
                                 };
                                 self.send_event(RunnerEvent::DeviceStateUpdate(
                                     DeviceState::Connected,
-                                ))?;
+                                ));
                                 self.send_event(RunnerEvent::RunnerStateUpdate(
                                     RunnerState::Running,
-                                ))?;
+                                ));
                             }
                             Ok(msg) => {
                                 info!("{msg}");
-                                self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Done))?;
+                                self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Done));
                                 break;
                             }
                         }
@@ -292,7 +293,7 @@ impl<T: ConnectionBackend> Runner<T> {
 
         let dlpc_info = dlpc.query_info().await?;
 
-        self.send_event(RunnerEvent::DeviceStateUpdate(dlpc_info.mode.into()))?;
+        self.send_event(RunnerEvent::DeviceStateUpdate(dlpc_info.mode.into()));
 
         if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
             return Err(Dlpc8445Error::general(format!(
@@ -342,7 +343,7 @@ impl<T: ConnectionBackend> Runner<T> {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
                 current: flash_state.current_sector_index(),
                 total: total_sectors,
-            }))?;
+            }));
 
             let sector = flash_state.current_sector();
 
@@ -409,7 +410,7 @@ impl<T: ConnectionBackend> Runner<T> {
         self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
             current: total_sectors,
             total: total_sectors,
-        }))?;
+        }));
 
         dlpc.lock_flash().await?;
         Ok("Flash programming complete!".to_string())
@@ -426,7 +427,7 @@ impl<T: ConnectionBackend> Runner<T> {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
                 current: flash_state.current_sector_index(),
                 total: total_sectors,
-            }))?;
+            }));
 
             let sector = flash_state.current_sector();
 
@@ -440,7 +441,7 @@ impl<T: ConnectionBackend> Runner<T> {
         self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
             current: total_sectors,
             total: total_sectors,
-        }))?;
+        }));
 
         let (total, valid, invalid) = flash_state.validation_result();
 
@@ -468,7 +469,7 @@ impl<T: ConnectionBackend> Runner<T> {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
                 current: flash_state.current_sector_index(),
                 total: total_sectors,
-            }))?;
+            }));
 
             let sector = flash_state.current_sector();
             info!(
@@ -483,7 +484,7 @@ impl<T: ConnectionBackend> Runner<T> {
         self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
             current: total_sectors,
             total: total_sectors,
-        }))?;
+        }));
 
         Ok("All sectors erased successfully".to_string())
     }
