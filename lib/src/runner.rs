@@ -14,7 +14,7 @@ use crate::{
     Dlpc8445Error, Result,
     dlpc8445::{ConnectionBackend, Dlpc8445Con},
     flash::{FLASH_SECTOR_SIZE, FlashState},
-    protocol::ApplicationMode,
+    protocol::{ApplicationMode, SwitchApplicationOption},
     sleep,
 };
 
@@ -29,6 +29,9 @@ pub enum RunnerCommand {
     StartAction {
         action: RunnerAction,
         enter_flash_mode: bool,
+    },
+    SwitchMode {
+        mode: SwitchApplicationOption,
     },
 }
 
@@ -193,6 +196,16 @@ impl<T: ConnectionBackend> Runner<T> {
                         error!("Failed to request device access: {err}");
                     }
                 },
+                RunnerCommand::SwitchMode { mode } => {
+                    let Some(mut dlpc) = self.dlpc.borrow_mut().take() else {
+                        error!("No active device connection; cannot switch mode {mode}");
+                        continue;
+                    };
+
+                    if let Err(err) = dlpc.switch_mode(mode).await {
+                        error!("Failed to switch mode {mode}: {err}");
+                    }
+                }
                 RunnerCommand::LoadImage { image } => {
                     self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
                         current: 0,
