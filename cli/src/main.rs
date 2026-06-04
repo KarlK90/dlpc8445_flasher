@@ -10,7 +10,6 @@ use clap::Parser;
 use git_version::git_version;
 use log::{info, warn};
 use tokio::io::AsyncBufReadExt;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::unbounded_channel;
 
 use dlpc8445_proto::flash::FlashState;
