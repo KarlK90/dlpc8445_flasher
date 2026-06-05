@@ -18,9 +18,17 @@ pub fn HelpInformationCard() -> Element {
             CardContent {
                 ol {
                     class: "list-decimal px-4",
-                    li {
-                        strong { "Request Device Access" }
-                        " - Click \"Request Device Access\" to allow the browser to communicate with the DLPC 8445 via WebUSB."
+                    if cfg!(target_family = "wasm") {
+                        li {
+                            strong { "Request Device Access" }
+                            " - Click \"Request Device Access\" to allow the browser to communicate with the DLPC 8445 via WebUSB."
+                        }
+                    } else {
+                        li {
+                            strong { "Connect the device" }
+                            " - If the connection is successful the Connection Status will change to Connected."
+                        }
+
                     }
                     li {
                         strong { "Choose Firmware Image" }

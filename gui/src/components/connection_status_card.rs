@@ -42,18 +42,20 @@ pub fn ConnectionStatusCard() -> Element {
             }
             CardFooter {
                 CardAction {
-                    Button {
-                        disabled: matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect),
-                        onclick: move |_| {
-                            spawn(
-                                async move {
-                                    state.send_command(RunnerCommand::RequestDeviceAccess).await;
-                                }
-                            );
-                        },
-                        variant: ButtonVariant::Outline,
-                        Usb { size: 20, stroke: "black" }
-                        "Request Device Access"
+                    if cfg!(target_family = "wasm") {
+                        Button {
+                            disabled: matches!(*state.runner_state.read(), RunnerState::Running | RunnerState::WaitingForReconnect),
+                            onclick: move |_| {
+                                spawn(
+                                    async move {
+                                        state.send_command(RunnerCommand::RequestDeviceAccess).await;
+                                    }
+                                );
+                            },
+                            variant: ButtonVariant::Outline,
+                            Usb { size: 20, stroke: "black" }
+                            "Request Device Access"
+                        }
                     }
                 }
             }
