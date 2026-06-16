@@ -144,12 +144,11 @@ impl<T: ConnectionBackend> Runner<T> {
     pub async fn idle_task(&mut self) {
         let mut lost_connection = true;
 
-        if let Some(dlpc) = self.dlpc.borrow_mut().as_mut() {
-            if let Ok(state) = dlpc.read_device_state().await {
+        if let Some(dlpc) = self.dlpc.borrow_mut().as_mut()
+            && let Ok(state) = dlpc.read_device_state().await {
                 self.send_event(RunnerEvent::DeviceStateUpdate(state));
                 lost_connection = false;
             }
-        }
 
         if lost_connection {
             self.dlpc.replace(None);
@@ -359,7 +358,7 @@ impl<T: ConnectionBackend> Runner<T> {
         let total_sectors = flash_state.sectors().len();
         while let Some(sector) = flash_state.current_sector() {
             self.send_event(RunnerEvent::ProgressUpdate(ActionProgress {
-                current: 0 + (total_sectors - sector.idx), // Flash progress is reversed
+                current: (total_sectors - sector.idx), // Flash progress is reversed
                 total: total_sectors,
             }));
             if sector.checksum_unreliable {

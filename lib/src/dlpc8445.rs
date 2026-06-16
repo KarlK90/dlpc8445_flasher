@@ -12,7 +12,7 @@ use crate::{
         ApplicationMode, BootHoldReasonResponse, FlashIdResponse, FlashSectorInformationResponse,
         ReadBootHoldReasonCommand, ReadExtendedSoftwareVersionCommand, ReadFlashIdCommand,
         ReadGetFlashSectorInformationCommand, ReadModeCommand, ReadVersionCommand,
-        SwitchApplicationOption, VersionResponse, WriteSwitchApplicationCommand,
+        SwitchApplicationOption, WriteSwitchApplicationCommand,
     },
     runner::DeviceState,
     sleep,

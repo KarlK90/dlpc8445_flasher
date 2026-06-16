@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
 
-use core::fmt::{self, Display};
-use std::{fmt::write, io::Cursor, marker::PhantomData};
+use core::fmt::Display;
+use std::{io::Cursor, marker::PhantomData};
 
 use binrw::{BinRead, BinWrite, Endian, binread, binwrite, helpers::until_eof};
 use bitfield_struct::bitfield;
@@ -646,7 +646,7 @@ mod tests {
     #[test]
     fn encode_erase_sector_command() -> Result<()> {
         assert_eq!(
-            fletcher_64(&[0x71, 0x23, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00]) as u8,
+            fletcher_64([0x71, 0x23, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00]) as u8,
             0x99
         );
 
@@ -1034,7 +1034,7 @@ mod tests {
         assert_eq!(response_packet.data.len(), 0);
 
         // Decode the empty response payload
-        let _empty = <()>::decode(response_packet.data)?;
+        <()>::decode(response_packet.data)?;
         Ok(())
     }
 }

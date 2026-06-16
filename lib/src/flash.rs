@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use log::{error, info, warn};
+use log::{info, warn};
 
 use crate::{Dlpc8445Error, Result, fletcher_64};
 
