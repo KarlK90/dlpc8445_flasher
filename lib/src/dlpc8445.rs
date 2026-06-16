@@ -10,9 +10,11 @@ use crate::{
     flash::{FLASH_PAGE_SIZE, FlashSector},
     protocol::{
         ApplicationMode, BootHoldReasonResponse, FlashIdResponse, FlashSectorInformationResponse,
-        ReadBootHoldReasonCommand, ReadFlashIdCommand, ReadGetFlashSectorInformationCommand,
-        ReadModeCommand, SwitchApplicationOption, WriteSwitchApplicationCommand,
+        ReadBootHoldReasonCommand, ReadExtendedSoftwareVersionCommand, ReadFlashIdCommand,
+        ReadGetFlashSectorInformationCommand, ReadModeCommand, ReadVersionCommand,
+        SwitchApplicationOption, VersionResponse, WriteSwitchApplicationCommand,
     },
+    runner::DeviceState,
     sleep,
 };
 use crate::{
@@ -97,12 +99,35 @@ impl<T: ConnectionBackend> Dlpc8445Con<T> {
     }
 
     pub async fn read_mode(&mut self) -> Result<ApplicationMode> {
+        Ok(self
+            .inner
+            .send_command(ReadModeCommand)
+            .await?
+            .application_mode())
+    }
+
+    pub async fn read_device_state(&mut self) -> Result<DeviceState> {
         let mode = self
             .inner
             .send_command(ReadModeCommand)
             .await?
             .application_mode();
-        Ok(mode)
+
+        let device_state = match mode {
+            ApplicationMode::MainApplication => DeviceState::ConnectedApplication {
+                version: self.inner.send_command(ReadVersionCommand).await?,
+                extended_version: self
+                    .inner
+                    .send_command(ReadExtendedSoftwareVersionCommand)
+                    .await?,
+            },
+            ApplicationMode::BootRom | ApplicationMode::SecondaryBootApplication => {
+                DeviceState::ConnectedFlashMode
+            }
+            ApplicationMode::Unknown => DeviceState::Connected,
+        };
+
+        Ok(device_state)
     }
 
     pub async fn unlock_flash(&mut self) -> Result<()> {

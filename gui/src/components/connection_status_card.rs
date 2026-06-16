@@ -16,11 +16,21 @@ use crate::{
 #[component]
 pub fn ConnectionStatusCard() -> Element {
     let state = use_context::<Dlpc8445GuiState>();
-    let status = state.device_state.read().cloned().to_string();
-    let color = if *state.device_state.read() == DeviceState::Disconnected {
+    let status = state.device_state.read().cloned();
+    let color = if status == DeviceState::Disconnected {
         "grey"
     } else {
         "lightgreen"
+    };
+    let version = if let DeviceState::ConnectedApplication {
+        version,
+        extended_version,
+    } = status
+    {
+        let commit_id = String::from_utf8_lossy(&extended_version.commit_id);
+        format!("Firmware version: {version} ({commit_id})")
+    } else {
+        format!("Firmware version: unknown")
     };
 
     rsx! {
@@ -37,7 +47,13 @@ pub fn ConnectionStatusCard() -> Element {
                         class: "mr-2",
                         Circle { size: 20, stroke: "{ color }", fill: "{color}" }
                     }
-                    { status }
+                    "{status}"
+                }
+                div {
+                    class: "mt-2 font-mono",
+                    div {
+                        "{version}"
+                    }
                 }
             }
             CardFooter {

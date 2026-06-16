@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Stefan Kerkmann <karlk90@pm.me>
 
-use std::{io::Cursor, marker::PhantomData};
+use core::fmt::{self, Display};
+use std::{fmt::write, io::Cursor, marker::PhantomData};
 
 use binrw::{BinRead, BinWrite, Endian, binread, binwrite, helpers::until_eof};
 use bitfield_struct::bitfield;
@@ -529,6 +530,12 @@ pub struct VersionResponse {
     pub major: u8,
     pub minor: u8,
     pub patch: u8,
+}
+
+impl Display for VersionResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr, Display)]

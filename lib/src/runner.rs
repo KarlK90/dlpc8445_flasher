@@ -14,7 +14,7 @@ use crate::{
     Dlpc8445Error, Result,
     dlpc8445::{ConnectionBackend, Dlpc8445Con},
     flash::{FLASH_SECTOR_SIZE, FlashState},
-    protocol::{ApplicationMode, SwitchApplicationOption},
+    protocol::{ExtendedSoftwareVersionResponse, SwitchApplicationOption, VersionResponse},
     sleep,
 };
 
@@ -56,28 +56,22 @@ impl Display for RunnerAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceState {
     Disconnected,
-    ConnectedApplication,
+    ConnectedApplication {
+        version: VersionResponse,
+        extended_version: ExtendedSoftwareVersionResponse,
+    },
     ConnectedFlashMode,
     Connected,
-}
-
-impl From<ApplicationMode> for DeviceState {
-    fn from(mode: ApplicationMode) -> Self {
-        match mode {
-            ApplicationMode::MainApplication => DeviceState::ConnectedApplication,
-            ApplicationMode::BootRom | ApplicationMode::SecondaryBootApplication => {
-                DeviceState::ConnectedFlashMode
-            }
-            ApplicationMode::Unknown => DeviceState::Connected,
-        }
-    }
 }
 
 impl Display for DeviceState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let status = match self {
             DeviceState::Disconnected => "Disconnected",
-            DeviceState::ConnectedApplication => "Connected (Application Mode)",
+            DeviceState::ConnectedApplication {
+                version: _,
+                extended_version: _,
+            } => "Connected (Application Mode)",
             DeviceState::ConnectedFlashMode => "Connected (Flash Mode)",
             DeviceState::Connected => "Connected",
         };
@@ -151,8 +145,8 @@ impl<T: ConnectionBackend> Runner<T> {
         let mut lost_connection = true;
 
         if let Some(dlpc) = self.dlpc.borrow_mut().as_mut() {
-            if let Ok(mode) = dlpc.read_mode().await {
-                self.send_event(RunnerEvent::DeviceStateUpdate(mode.into()));
+            if let Ok(state) = dlpc.read_device_state().await {
+                self.send_event(RunnerEvent::DeviceStateUpdate(state));
                 lost_connection = false;
             }
         }
@@ -316,9 +310,11 @@ impl<T: ConnectionBackend> Runner<T> {
         self.send_event(RunnerEvent::RunnerStateUpdate(RunnerState::Running));
         dlpc.verify_flash_mode(enter_flash_mode).await?;
 
-        let dlpc_info = dlpc.query_info().await?;
+        self.send_event(RunnerEvent::DeviceStateUpdate(
+            dlpc.read_device_state().await?,
+        ));
 
-        self.send_event(RunnerEvent::DeviceStateUpdate(dlpc_info.mode.into()));
+        let dlpc_info = dlpc.query_info().await?;
 
         if dlpc_info.flash_sector.sector_size as usize != FLASH_SECTOR_SIZE {
             return Err(Dlpc8445Error::RunnerAbort(format!(
